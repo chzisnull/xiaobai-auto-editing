@@ -1,0 +1,1317 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5f5f7">
+  <title>小白自动剪辑</title>
+  <script src="./vendor/lucide.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1d1d1f;
+      --muted: #6e6e73;
+      --line: rgba(60, 60, 67, 0.16);
+      --line-strong: rgba(60, 60, 67, 0.28);
+      --surface: rgba(255, 255, 255, 0.78);
+      --surface-soft: rgba(118, 118, 128, 0.09);
+      --canvas: #f2f2f7;
+      --stage: #111113;
+      --green: #34c759;
+      --green-strong: #248a3d;
+      --green-soft: rgba(52, 199, 89, 0.12);
+      --blue: #007aff;
+      --blue-strong: #0062cc;
+      --amber: #a05a00;
+      --danger: #ff3b30;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.09);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { min-width: 320px; background: var(--canvas); }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      background: var(--canvas);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    button, input, select { font: inherit; letter-spacing: 0; }
+    button, label[for="videoInput"] { -webkit-tap-highlight-color: transparent; }
+    button:focus-visible, input:focus-visible, select:focus-visible, label[for="videoInput"]:focus-visible {
+      outline: 3px solid rgba(0, 122, 255, 0.24);
+      outline-offset: 2px;
+    }
+
+    .app-header {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      height: 64px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--ink);
+      background: rgba(250, 250, 252, 0.78);
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
+      -webkit-backdrop-filter: saturate(180%) blur(22px);
+      backdrop-filter: saturate(180%) blur(22px);
+    }
+
+    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand-mark {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      flex: 0 0 auto;
+      color: #fff;
+      background: var(--blue);
+      border-radius: 7px;
+      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2);
+    }
+    .brand-mark svg { width: 19px; height: 19px; }
+    .brand-name { font-size: 16px; font-weight: 680; line-height: 1.15; }
+    .brand-subtitle { margin-top: 2px; color: var(--muted); font-size: 11px; }
+
+    .api-state { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
+    .api-dot { width: 8px; height: 8px; border-radius: 50%; background: #8e8e93; }
+    .api-state.online .api-dot { background: var(--green); box-shadow: 0 0 0 4px rgba(52, 199, 89, 0.12); }
+    .api-state.offline .api-dot { background: var(--danger); }
+
+    .workspace {
+      min-height: calc(100vh - 104px);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      max-width: 1600px;
+      width: calc(100% - 40px);
+      margin: 20px auto;
+      background: var(--surface);
+      border: 1px solid rgba(255, 255, 255, 0.82);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: clip;
+      -webkit-backdrop-filter: saturate(150%) blur(28px);
+      backdrop-filter: saturate(150%) blur(28px);
+    }
+
+    .editor {
+      min-width: 0;
+      padding: 24px 28px 36px;
+      border-right: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.34);
+    }
+
+    .source-bar {
+      min-height: 48px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .source-meta { min-width: 0; }
+    .source-name {
+      max-width: min(58vw, 760px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 15px;
+      font-weight: 680;
+    }
+    .source-detail { margin-top: 4px; color: var(--muted); font-size: 12px; }
+    .source-actions { display: flex; align-items: center; gap: 8px; }
+
+    .button {
+      min-height: 44px;
+      border: 0;
+      border-radius: 7px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 14px;
+      font-weight: 620;
+      cursor: pointer;
+      transition: background-color 200ms ease, color 200ms ease, transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+    }
+    .button:hover { transform: translateY(-1px); }
+    .button:active { transform: translateY(0); }
+    .button:disabled { cursor: not-allowed; opacity: 0.48; transform: none; }
+    .button svg { width: 17px; height: 17px; }
+    .button-primary { color: #fff; background: var(--blue); box-shadow: 0 5px 14px rgba(0, 122, 255, 0.18); }
+    .button-primary:hover { background: var(--blue-strong); box-shadow: 0 7px 18px rgba(0, 122, 255, 0.23); }
+    .button-secondary { color: var(--ink); background: rgba(255, 255, 255, 0.7); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03); }
+    .button-secondary:hover { background: rgba(255, 255, 255, 0.96); border-color: var(--line-strong); }
+    .button-quiet { min-height: 44px; padding: 0 10px; color: var(--muted); background: transparent; }
+    .button-quiet:hover { color: var(--ink); background: var(--surface-soft); }
+    .button-icon { width: 44px; height: 44px; min-height: 44px; padding: 0; }
+    .button-danger:hover { color: var(--danger); background: rgba(255, 59, 48, 0.09); }
+
+    .video-stage {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      min-height: 260px;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: var(--stage);
+      border-radius: var(--radius);
+      border: 1px solid rgba(0, 0, 0, 0.42);
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+    }
+    .video-stage.dragging { box-shadow: inset 0 0 0 3px var(--blue), 0 12px 28px rgba(0, 0, 0, 0.16); }
+    .video-stage video { width: 100%; height: 100%; object-fit: contain; background: #050506; }
+
+    .court-overlay {
+      position: absolute;
+      z-index: 6;
+      display: none;
+      overflow: visible;
+      touch-action: none;
+    }
+    .court-overlay.visible { display: block; }
+    .court-area { fill: rgba(0, 122, 255, 0.16); stroke: #64d2ff; stroke-width: 5; vector-effect: non-scaling-stroke; }
+    .court-handle-hit { fill: transparent; cursor: grab; }
+    .court-handle { fill: #fff; stroke: var(--blue); stroke-width: 5; vector-effect: non-scaling-stroke; pointer-events: none; }
+    .court-tools {
+      position: absolute;
+      inset: auto 12px 12px;
+      z-index: 7;
+      min-height: 44px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 7px 6px 12px;
+      color: #eef8f2;
+      background: rgba(28, 28, 30, 0.82);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 7px;
+      -webkit-backdrop-filter: saturate(160%) blur(18px);
+      backdrop-filter: saturate(160%) blur(18px);
+    }
+    .court-tools.visible { display: flex; animation: enter 180ms ease both; }
+    .court-tools-label { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; font-weight: 650; }
+    .court-tools-label svg { width: 16px; height: 16px; color: #64d2ff; }
+    .court-tool-actions { display: flex; gap: 5px; }
+    .court-tools .button-quiet { color: #c4d0c9; }
+    .court-tools .button-quiet:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+    .court-tools .button-primary { min-height: 44px; }
+
+    .empty-source {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: #111113;
+    }
+    .empty-source.hidden { display: none; }
+    .empty-source-inner { text-align: center; animation: enter 420ms ease both; }
+    .empty-icon {
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 16px;
+      display: grid;
+      place-items: center;
+      color: #64d2ff;
+      background: #1c1c1e;
+      border: 1px solid #3a3a3c;
+      border-radius: 8px;
+    }
+    .empty-icon svg { width: 27px; height: 27px; }
+    .empty-title { margin: 0 0 6px; font-size: 18px; font-weight: 720; }
+    .empty-copy { margin: 0 0 18px; color: #a1a1a6; font-size: 12px; }
+    .file-label { cursor: pointer; }
+
+    .task-banner {
+      min-height: 40px;
+      margin-top: 12px;
+      padding: 0 12px;
+      display: none;
+      align-items: center;
+      gap: 10px;
+      color: var(--blue);
+      background: rgba(0, 122, 255, 0.09);
+      border-left: 3px solid var(--blue);
+      border-radius: 4px;
+    }
+    .task-banner.visible { display: flex; animation: enter 220ms ease both; }
+    .task-banner.error { color: #d70015; background: rgba(255, 59, 48, 0.09); border-left-color: var(--danger); }
+    .task-banner.success { color: var(--green-strong); background: var(--green-soft); border-left-color: var(--green); }
+    .task-banner svg { width: 16px; height: 16px; flex: 0 0 auto; }
+    .task-banner .spin { animation: spin 900ms linear infinite; }
+    .task-banner-text { min-width: 0; flex: 1; font-size: 12px; }
+    .progress-track { width: 120px; height: 4px; overflow: hidden; background: rgba(0, 122, 255, 0.14); border-radius: 2px; }
+    .progress-fill { width: 0; height: 100%; background: currentColor; transition: width 160ms ease; }
+    .progress-track.indeterminate .progress-fill { width: 42%; animation: indeterminate 1.25s ease-in-out infinite; }
+
+    .timeline-section { margin-top: 26px; }
+    .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
+    .section-heading h2 { margin: 0; font-size: 15px; font-weight: 720; }
+    .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .timeline-actions { display: flex; align-items: center; gap: 4px; }
+
+    .timeline-shell {
+      position: relative;
+      height: 76px;
+      padding: 18px 10px 17px;
+      background: var(--surface-soft);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      user-select: none;
+      touch-action: none;
+    }
+    .timeline-track { position: relative; height: 38px; background: rgba(118, 118, 128, 0.18); border-radius: 4px; overflow: hidden; }
+    .timeline-progress { position: absolute; inset: 0 auto 0 0; width: 0; pointer-events: none; background: rgba(255, 255, 255, 0.42); border-right: 1px solid rgba(29, 29, 31, 0.38); z-index: 4; }
+    .segment {
+      position: absolute;
+      top: 5px;
+      height: 28px;
+      min-width: 5px;
+      cursor: grab;
+      background: var(--blue);
+      border: 1px solid var(--blue-strong);
+      border-radius: 3px;
+      z-index: 2;
+      transition: filter 120ms ease, box-shadow 120ms ease;
+    }
+    .segment:hover, .segment.active { filter: brightness(1.06); box-shadow: 0 3px 10px rgba(0, 122, 255, 0.28); z-index: 3; }
+    .segment.low-confidence { background: #ff9f0a; border-color: #c77700; }
+    .segment:active { cursor: grabbing; }
+    .segment-handle { position: absolute; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+    .segment-handle::after { content: ""; position: absolute; top: 7px; bottom: 7px; width: 1px; background: rgba(255,255,255,0.85); }
+    .segment-handle.start { left: 0; }
+    .segment-handle.start::after { left: 3px; }
+    .segment-handle.end { right: 0; }
+    .segment-handle.end::after { right: 3px; }
+    .timeline-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+
+    .timeline-ruler { position: absolute; inset: auto 10px 3px; display: flex; justify-content: space-between; color: #8e8e93; font-size: 10px; font-variant-numeric: tabular-nums; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      margin: 16px 0 4px;
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+    }
+    .metric { min-width: 0; padding: 13px 14px; border-right: 1px solid var(--line); }
+    .metric:first-child { padding-left: 0; }
+    .metric:last-child { border-right: 0; }
+    .metric-label { color: var(--muted); font-size: 11px; }
+    .metric-value { margin-top: 4px; font-size: 17px; font-weight: 720; font-variant-numeric: tabular-nums; }
+
+    .rally-list { margin-top: 18px; }
+    .rally-list-header {
+      display: grid;
+      grid-template-columns: 44px minmax(100px, 1fr) minmax(100px, 1fr) 72px 96px;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 8px;
+      color: var(--muted);
+      font-size: 11px;
+      border-bottom: 1px solid var(--line);
+    }
+    .rally-rows { max-height: 310px; overflow-y: auto; scrollbar-gutter: stable; }
+    .rally-row {
+      display: grid;
+      grid-template-columns: 44px minmax(100px, 1fr) minmax(100px, 1fr) 72px 96px;
+      align-items: center;
+      min-height: 60px;
+      padding: 0 8px;
+      border-bottom: 1px solid var(--line);
+      animation: enter 220ms ease both;
+    }
+    .rally-row:hover { background: rgba(0, 122, 255, 0.045); }
+    .rally-index { color: var(--blue); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .time-input {
+      width: 100%;
+      max-width: 116px;
+      height: 40px;
+      padding: 0 9px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid var(--line-strong);
+      border-radius: 5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .duration-cell { color: var(--muted); font-variant-numeric: tabular-nums; }
+    .row-actions { display: flex; justify-content: flex-end; gap: 0; }
+    .list-empty { min-height: 108px; display: grid; place-items: center; color: var(--muted); border-bottom: 1px solid var(--line); }
+
+    .inspector { min-width: 0; background: rgba(248, 248, 252, 0.58); }
+    .inspector-inner { position: sticky; top: 0; padding: 24px; }
+    .inspector-title { margin: 0; font-size: 16px; font-weight: 740; }
+    .inspector-subtitle { margin: 5px 0 22px; color: var(--muted); font-size: 12px; }
+    .control-group { padding: 18px 0; border-top: 1px solid var(--line); }
+    .control-group:first-of-type { border-top: 0; padding-top: 0; }
+    .control-label { display: block; margin-bottom: 9px; color: #3a3a3c; font-size: 12px; font-weight: 650; }
+
+    .segmented { display: grid; grid-template-columns: repeat(var(--columns, 3), minmax(0, 1fr)); gap: 3px; padding: 3px; background: rgba(118, 118, 128, 0.12); border-radius: 7px; }
+    .segmented input { position: absolute; opacity: 0; pointer-events: none; }
+    .segmented label {
+      min-width: 0;
+      min-height: 38px;
+      display: grid;
+      place-items: center;
+      padding: 5px 8px;
+      text-align: center;
+      color: #636366;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 620;
+      transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+    }
+    .segmented input:checked + label { color: var(--ink); background: rgba(255, 255, 255, 0.92); box-shadow: 0 1px 5px rgba(0, 0, 0, 0.11); }
+
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .field label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 11px; }
+    .field select, .field input[type="number"] {
+      width: 100%;
+      height: 38px;
+      padding: 0 9px;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.76);
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+    }
+    .range-row { display: grid; grid-template-columns: minmax(0, 1fr) 38px; align-items: center; gap: 12px; }
+    input[type="range"] { width: 100%; accent-color: var(--blue); }
+    .range-value { height: 30px; display: grid; place-items: center; background: rgba(118, 118, 128, 0.11); border-radius: 5px; font-variant-numeric: tabular-nums; font-weight: 680; }
+
+    .export-button { width: 100%; min-height: 46px; margin-top: 4px; }
+    .export-result { display: none; margin-top: 14px; padding: 13px 0 0; border-top: 1px solid var(--line); }
+    .export-result.visible { display: block; animation: enter 240ms ease both; }
+    .export-result-title { display: flex; align-items: center; gap: 8px; color: var(--green-strong); font-weight: 720; }
+    .export-result-title svg { width: 17px; height: 17px; }
+    .export-result-meta { margin: 5px 0 12px; color: var(--muted); font-size: 12px; }
+    .download-link { width: 100%; text-decoration: none; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      z-index: 50;
+      max-width: min(440px, calc(100vw - 32px));
+      padding: 11px 14px;
+      color: #fff;
+      background: rgba(29, 29, 31, 0.9);
+      border-radius: 7px;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 12px);
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+    .toast.visible { opacity: 1; transform: translate(-50%, 0); }
+    .toast.error { background: #852b2a; }
+
+    .hidden-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .spin { animation: spin 900ms linear infinite; }
+
+    @keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes indeterminate { 0% { transform: translateX(-110%); } 100% { transform: translateX(350%); } }
+
+    @media (max-width: 980px) {
+      .workspace { width: calc(100% - 24px); margin: 12px auto; grid-template-columns: 1fr; }
+      .editor { border-right: 0; }
+      .inspector { border-top: 1px solid var(--line); }
+      .inspector-inner { position: static; }
+    }
+
+    @media (max-width: 640px) {
+      .app-header { height: 58px; padding: 0 15px; }
+      .brand-subtitle, .api-state span { display: none; }
+      .workspace { width: 100%; min-height: calc(100vh - 58px); margin: 0; border: 0; border-radius: 0; }
+      .editor { padding: 16px 14px 26px; }
+      .source-bar { align-items: flex-start; }
+      .source-name { max-width: 58vw; }
+      .source-actions { gap: 4px; }
+      .button-change span { display: none; }
+      .button-change { width: 38px; padding: 0; }
+      .court-tools { inset: auto 8px 8px; }
+      .court-tools-label span { display: none; }
+      .video-stage { min-height: 180px; }
+      .progress-track { width: 70px; }
+      .section-heading { align-items: center; }
+      .section-heading p { display: none; }
+      .metrics { grid-template-columns: 1fr 1fr; }
+      .metric:nth-child(2) { border-right: 0; }
+      .metric:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line); }
+      .rally-list-header { display: none; }
+      .rally-row {
+        grid-template-columns: 34px minmax(68px, 1fr) minmax(68px, 1fr) 92px;
+        gap: 6px;
+        padding: 8px 2px;
+      }
+      .duration-cell { display: none; }
+      .time-input { padding: 0 6px; }
+      .inspector-inner { padding: 22px 16px 28px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark"><i data-lucide="scissors"></i></div>
+      <div>
+        <div class="brand-name">小白自动剪辑</div>
+        <div class="brand-subtitle">羽毛球回合智能剪辑</div>
+      </div>
+    </div>
+    <div class="api-state" id="apiState">
+      <span class="api-dot"></span>
+      <span id="apiStateText">正在连接服务</span>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <section class="editor" aria-label="视频剪辑区">
+      <div class="source-bar">
+        <div class="source-meta">
+          <div class="source-name" id="sourceName">尚未选择录像</div>
+          <div class="source-detail" id="sourceDetail">等待导入</div>
+        </div>
+        <div class="source-actions">
+          <button class="button button-secondary button-change" id="calibrateCourtButton" title="校准目标球场" aria-label="校准目标球场" disabled>
+            <i data-lucide="scan-line"></i><span>目标球场</span>
+          </button>
+          <label for="videoInput" class="button button-secondary button-change" tabindex="0">
+            <i data-lucide="folder-open"></i><span>选择录像</span>
+          </label>
+        </div>
+      </div>
+
+      <input class="hidden-input" type="file" id="videoInput" accept="video/mp4,video/quicktime,video/x-matroska,video/webm">
+
+      <div class="video-stage" id="videoStage">
+        <video id="videoPlayer" controls playsinline preload="metadata"></video>
+        <svg class="court-overlay" id="courtOverlay" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="目标球场边界">
+          <polygon class="court-area" id="courtArea"></polygon>
+          <g id="courtHandles"></g>
+        </svg>
+        <div class="court-tools" id="courtTools">
+          <div class="court-tools-label"><i data-lucide="scan-line"></i><span>目标球场边界</span></div>
+          <div class="court-tool-actions">
+            <button class="button button-quiet button-icon" id="resetCourtButton" title="重置边界" aria-label="重置球场边界"><i data-lucide="rotate-ccw"></i></button>
+            <button class="button button-primary" id="confirmCourtButton"><i data-lucide="sparkles"></i>开始识别</button>
+          </div>
+        </div>
+        <div class="empty-source" id="emptySource">
+          <div class="empty-source-inner">
+            <div class="empty-icon"><i data-lucide="video"></i></div>
+            <h1 class="empty-title">导入比赛录像</h1>
+            <p class="empty-copy">MP4、MOV、MKV 或 WebM</p>
+            <label for="videoInput" class="button button-primary file-label" tabindex="0">
+              <i data-lucide="upload"></i>选择文件
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="task-banner" id="taskBanner" role="status" aria-live="polite">
+        <i data-lucide="loader-circle" id="taskIcon"></i>
+        <div class="task-banner-text" id="taskBannerText"></div>
+        <div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div></div>
+      </div>
+
+      <section class="timeline-section" aria-labelledby="timelineTitle">
+        <div class="section-heading">
+          <div>
+            <h2 id="timelineTitle">自动识别回合</h2>
+            <p id="timelineSubtitle">可调整每个回合的起止时间</p>
+          </div>
+          <div class="timeline-actions">
+            <button class="button button-quiet button-icon" id="addRallyButton" title="在当前播放位置添加回合" aria-label="添加回合" disabled>
+              <i data-lucide="plus"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="timeline-shell" id="timelineShell">
+          <div class="timeline-track" id="timelineTrack">
+            <div class="timeline-progress" id="timelineProgress"></div>
+            <div class="timeline-empty" id="timelineEmpty">等待识别结果</div>
+          </div>
+          <div class="timeline-ruler" id="timelineRuler">
+            <span>00:00</span><span>00:00</span><span>00:00</span><span>00:00</span><span>00:00</span>
+          </div>
+        </div>
+
+        <div class="metrics">
+          <div class="metric"><div class="metric-label">原片时长</div><div class="metric-value" id="originalDuration">00:00</div></div>
+          <div class="metric"><div class="metric-label">预计成片</div><div class="metric-value" id="selectedDuration">00:00</div></div>
+          <div class="metric"><div class="metric-label">预计精简</div><div class="metric-value" id="reductionRate">0%</div></div>
+        </div>
+
+        <div class="rally-list">
+          <div class="rally-list-header">
+            <span>序号</span><span>开始</span><span>结束</span><span>时长</span><span></span>
+          </div>
+          <div class="rally-rows" id="rallyRows">
+            <div class="list-empty">暂无回合</div>
+          </div>
+        </div>
+      </section>
+    </section>
+
+    <aside class="inspector" aria-label="导出设置">
+      <div class="inspector-inner">
+        <h2 class="inspector-title">导出设置</h2>
+        <p class="inspector-subtitle" id="exportSummary">完成分析后即可导出</p>
+
+        <div class="control-group">
+          <span class="control-label">输出方式</span>
+          <div class="segmented" style="--columns: 2">
+            <input type="radio" name="exportType" id="typeMerged" value="merged" checked>
+            <label for="typeMerged">合并视频</label>
+            <input type="radio" name="exportType" id="typeZip" value="zip">
+            <label for="typeZip">分段 ZIP</label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">分辨率</span>
+          <div class="segmented">
+            <input type="radio" name="resolution" id="resolutionOriginal" value="original">
+            <label for="resolutionOriginal">原画</label>
+            <input type="radio" name="resolution" id="resolution1080" value="1080p" checked>
+            <label for="resolution1080">1080p</label>
+            <input type="radio" name="resolution" id="resolution720" value="720p">
+            <label for="resolution720">720p</label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">编码格式</span>
+          <div class="segmented" style="--columns: 2">
+            <input type="radio" name="codec" id="codecH264" value="h264" checked>
+            <label for="codecH264">H.264</label>
+            <input type="radio" name="codec" id="codecHevc" value="hevc">
+            <label for="codecHevc">HEVC</label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label" for="crfRange">压缩质量</label>
+          <div class="range-row">
+            <input type="range" id="crfRange" min="18" max="32" step="1" value="24">
+            <output class="range-value" id="crfValue" for="crfRange">24</output>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="control-label">回合缓冲</span>
+          <div class="field-grid">
+            <div class="field">
+              <label for="preBuffer">发球前</label>
+              <select id="preBuffer"><option value="0" selected>0 秒</option><option value="0.3">0.3 秒</option><option value="0.5">0.5 秒</option><option value="1">1.0 秒</option></select>
+            </div>
+            <div class="field">
+              <label for="postBuffer">落地后</label>
+              <select id="postBuffer"><option value="0" selected>0 秒</option><option value="0.2">0.2 秒</option><option value="0.5">0.5 秒</option><option value="1">1.0 秒</option></select>
+            </div>
+          </div>
+        </div>
+
+        <button class="button button-primary export-button" id="exportButton" disabled>
+          <i data-lucide="download"></i><span id="exportButtonText">生成剪辑</span>
+        </button>
+
+        <div class="export-result" id="exportResult">
+          <div class="export-result-title"><i data-lucide="circle-check"></i>导出完成</div>
+          <div class="export-result-meta" id="exportResultMeta"></div>
+          <a class="button button-secondary download-link" id="downloadLink" href="#" download>
+            <i data-lucide="download"></i>下载文件
+          </a>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="toast" id="toast" role="alert"></div>
+
+  <script>
+    const API_BASE = '';
+    const DEFAULT_COURT_ROI = [
+      { x: 0.20, y: 0.34 },
+      { x: 0.82, y: 0.34 },
+      { x: 0.98, y: 0.96 },
+      { x: 0.02, y: 0.96 },
+    ];
+    const state = {
+      taskId: null,
+      file: null,
+      objectUrl: null,
+      duration: 0,
+      rallies: [],
+      status: 'idle',
+      pollTimer: null,
+      drag: null,
+      exportObjectUrl: null,
+      rallyPlaybackEnd: null,
+      courtRoi: DEFAULT_COURT_ROI.map(point => ({ ...point })),
+      courtDragIndex: null,
+      statusBeforeCalibration: 'idle',
+    };
+
+    const elements = {
+      apiState: document.getElementById('apiState'),
+      apiStateText: document.getElementById('apiStateText'),
+      videoInput: document.getElementById('videoInput'),
+      videoStage: document.getElementById('videoStage'),
+      videoPlayer: document.getElementById('videoPlayer'),
+      courtOverlay: document.getElementById('courtOverlay'),
+      courtArea: document.getElementById('courtArea'),
+      courtHandles: document.getElementById('courtHandles'),
+      courtTools: document.getElementById('courtTools'),
+      calibrateCourtButton: document.getElementById('calibrateCourtButton'),
+      resetCourtButton: document.getElementById('resetCourtButton'),
+      confirmCourtButton: document.getElementById('confirmCourtButton'),
+      emptySource: document.getElementById('emptySource'),
+      sourceName: document.getElementById('sourceName'),
+      sourceDetail: document.getElementById('sourceDetail'),
+      taskBanner: document.getElementById('taskBanner'),
+      taskBannerText: document.getElementById('taskBannerText'),
+      taskIcon: document.getElementById('taskIcon'),
+      progressTrack: document.getElementById('progressTrack'),
+      progressFill: document.getElementById('progressFill'),
+      timelineTrack: document.getElementById('timelineTrack'),
+      timelineEmpty: document.getElementById('timelineEmpty'),
+      timelineProgress: document.getElementById('timelineProgress'),
+      timelineRuler: document.getElementById('timelineRuler'),
+      originalDuration: document.getElementById('originalDuration'),
+      selectedDuration: document.getElementById('selectedDuration'),
+      reductionRate: document.getElementById('reductionRate'),
+      rallyRows: document.getElementById('rallyRows'),
+      addRallyButton: document.getElementById('addRallyButton'),
+      exportButton: document.getElementById('exportButton'),
+      exportButtonText: document.getElementById('exportButtonText'),
+      exportSummary: document.getElementById('exportSummary'),
+      exportResult: document.getElementById('exportResult'),
+      exportResultMeta: document.getElementById('exportResultMeta'),
+      downloadLink: document.getElementById('downloadLink'),
+      crfRange: document.getElementById('crfRange'),
+      crfValue: document.getElementById('crfValue'),
+      toast: document.getElementById('toast'),
+    };
+
+    function refreshIcons() {
+      if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+    }
+
+    function formatTime(seconds, tenths = false) {
+      const safe = Math.max(0, Number(seconds) || 0);
+      const minutes = Math.floor(safe / 60);
+      const remainder = safe - minutes * 60;
+      if (tenths) return `${String(minutes).padStart(2, '0')}:${remainder.toFixed(1).padStart(4, '0')}`;
+      return `${String(minutes).padStart(2, '0')}:${String(Math.floor(remainder)).padStart(2, '0')}`;
+    }
+
+    function updateCourtOverlayBounds() {
+      if (!elements.videoPlayer.videoWidth || !elements.videoStage.clientWidth) return;
+      const stageWidth = elements.videoStage.clientWidth;
+      const stageHeight = elements.videoStage.clientHeight;
+      const videoAspect = elements.videoPlayer.videoWidth / elements.videoPlayer.videoHeight;
+      const stageAspect = stageWidth / stageHeight;
+      let width = stageWidth;
+      let height = stageHeight;
+      let left = 0;
+      let top = 0;
+      if (videoAspect > stageAspect) {
+        height = stageWidth / videoAspect;
+        top = (stageHeight - height) / 2;
+      } else {
+        width = stageHeight * videoAspect;
+        left = (stageWidth - width) / 2;
+      }
+      Object.assign(elements.courtOverlay.style, {
+        left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px`,
+      });
+    }
+
+    function renderCourtOverlay() {
+      elements.courtArea.setAttribute('points', state.courtRoi.map(point => `${point.x * 1000},${point.y * 1000}`).join(' '));
+      elements.courtHandles.innerHTML = state.courtRoi.map((point, index) => `
+        <g data-court-index="${index}">
+          <circle class="court-handle-hit" cx="${point.x * 1000}" cy="${point.y * 1000}" r="48"></circle>
+          <circle class="court-handle" cx="${point.x * 1000}" cy="${point.y * 1000}" r="17"></circle>
+        </g>`).join('');
+      elements.courtHandles.querySelectorAll('[data-court-index]').forEach(handle => {
+        handle.addEventListener('pointerdown', event => {
+          event.preventDefault();
+          state.courtDragIndex = Number(handle.dataset.courtIndex);
+          elements.courtOverlay.setPointerCapture?.(event.pointerId);
+        });
+      });
+      updateCourtOverlayBounds();
+    }
+
+    function openCourtCalibration() {
+      if (!state.taskId || ['uploading', 'analyzing', 'exporting'].includes(state.status)) return;
+      state.statusBeforeCalibration = state.status;
+      state.status = 'calibrating';
+      state.rallyPlaybackEnd = null;
+      elements.videoPlayer.pause();
+      elements.courtOverlay.classList.add('visible');
+      elements.courtTools.classList.add('visible');
+      renderCourtOverlay();
+      setTaskBanner('调整目标球场边界', 'working');
+      renderControls();
+    }
+
+    function closeCourtCalibration() {
+      state.courtDragIndex = null;
+      elements.courtOverlay.classList.remove('visible');
+      elements.courtTools.classList.remove('visible');
+    }
+
+    function moveCourtHandle(event) {
+      if (state.courtDragIndex === null) return;
+      const rect = elements.courtOverlay.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const point = state.courtRoi[state.courtDragIndex];
+      point.x = Math.max(0.01, Math.min(0.99, (event.clientX - rect.left) / rect.width));
+      point.y = Math.max(0.01, Math.min(0.99, (event.clientY - rect.top) / rect.height));
+      renderCourtOverlay();
+    }
+
+    function showToast(message, type = 'normal') {
+      elements.toast.textContent = message;
+      elements.toast.className = `toast visible${type === 'error' ? ' error' : ''}`;
+      clearTimeout(showToast.timer);
+      showToast.timer = setTimeout(() => elements.toast.classList.remove('visible'), 3200);
+    }
+
+    function setTaskBanner(message, mode = 'working', progress = null) {
+      elements.taskBanner.className = `task-banner visible${mode === 'error' ? ' error' : mode === 'success' ? ' success' : ''}`;
+      elements.taskBannerText.textContent = message;
+      const taskIcon = document.getElementById('taskIcon');
+      taskIcon.setAttribute('data-lucide', mode === 'error' ? 'circle-alert' : mode === 'success' ? 'circle-check' : 'loader-circle');
+      taskIcon.classList.toggle('spin', mode === 'working');
+      elements.progressTrack.classList.toggle('indeterminate', mode === 'working' && progress === null);
+      elements.progressTrack.style.display = mode === 'working' ? 'block' : 'none';
+      elements.progressFill.style.width = progress === null ? '0%' : `${progress}%`;
+      refreshIcons();
+      elements.taskIcon = document.getElementById('taskIcon');
+    }
+
+    function hideTaskBanner() {
+      elements.taskBanner.classList.remove('visible');
+    }
+
+    async function checkApi() {
+      try {
+        const response = await fetch(`${API_BASE}/api/health`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('offline');
+        elements.apiState.className = 'api-state online';
+        elements.apiStateText.textContent = '服务已连接';
+      } catch {
+        elements.apiState.className = 'api-state offline';
+        elements.apiStateText.textContent = '服务不可用';
+      }
+    }
+
+    function resetForFile(file) {
+      clearInterval(state.pollTimer);
+      if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+      if (state.exportObjectUrl) URL.revokeObjectURL(state.exportObjectUrl);
+      state.taskId = null;
+      state.file = file;
+      state.duration = 0;
+      state.rallies = [];
+      state.rallyPlaybackEnd = null;
+      state.courtRoi = DEFAULT_COURT_ROI.map(point => ({ ...point }));
+      state.exportObjectUrl = null;
+      state.status = 'uploading';
+      state.objectUrl = URL.createObjectURL(file);
+      elements.videoPlayer.src = state.objectUrl;
+      elements.emptySource.classList.add('hidden');
+      elements.sourceName.textContent = file.name;
+      elements.sourceDetail.textContent = `${(file.size / 1024 / 1024).toFixed(1)} MB · 正在读取`;
+      elements.exportResult.classList.remove('visible');
+      renderAll();
+    }
+
+    async function handleFile(file) {
+      if (!file) return;
+      const suffix = file.name.split('.').pop().toLowerCase();
+      if (!['mp4', 'mov', 'mkv', 'm4v', 'avi', 'webm'].includes(suffix)) {
+        showToast('请选择 MP4、MOV、MKV、M4V、AVI 或 WebM 文件', 'error');
+        return;
+      }
+
+      resetForFile(file);
+      try {
+        const uploaded = await uploadVideo(file);
+        state.taskId = uploaded.task_id;
+        state.duration = Number(uploaded.duration) || elements.videoPlayer.duration || 0;
+        state.status = 'ready';
+        elements.sourceDetail.textContent = `${formatTime(state.duration)} · ${state.taskId}`;
+        renderAll();
+        openCourtCalibration();
+      } catch (error) {
+        state.status = 'error';
+        setTaskBanner(error.message || '上传失败', 'error');
+        renderAll();
+      }
+    }
+
+    function uploadVideo(file) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const form = new FormData();
+        form.append('file', file, file.name);
+        xhr.open('POST', `${API_BASE}/api/v1/video/upload`);
+        xhr.upload.addEventListener('progress', event => {
+          if (!event.lengthComputable) return;
+          const percent = Math.round((event.loaded / event.total) * 100);
+          setTaskBanner(`正在上传 ${percent}%`, 'working', percent);
+        });
+        xhr.addEventListener('load', () => {
+          let data = {};
+          try { data = JSON.parse(xhr.responseText || '{}'); } catch { /* no-op */ }
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+          else reject(new Error(data.detail || `上传失败 (${xhr.status})`));
+        });
+        xhr.addEventListener('error', () => reject(new Error('无法连接后端服务')));
+        xhr.send(form);
+      });
+    }
+
+    async function startAnalysis() {
+      closeCourtCalibration();
+      state.status = 'analyzing';
+      state.rallies = [];
+      state.rallyPlaybackEnd = null;
+      renderAll();
+      setTaskBanner('正在分析目标球场的发球与羽毛球轨迹', 'working');
+      const response = await fetch(`${API_BASE}/api/v1/ai/analyze/${state.taskId}?background=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ court_roi: state.courtRoi }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.detail || '分析任务启动失败');
+      await pollAnalysis();
+      clearInterval(state.pollTimer);
+      state.pollTimer = setInterval(pollAnalysis, 1400);
+    }
+
+    function applyAnalysisResult(data) {
+      state.duration = Number(data.original_duration) || state.duration;
+      state.rallies = (data.rallies || []).map((item, index) => ({
+        id: item.id || index + 1,
+        start: Number(item.start ?? item.start_time),
+        end: Math.min(state.duration || Infinity, Number(item.end ?? item.end_time)),
+        confidence: Number(item.confidence ?? 1),
+      })).filter(item => Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start);
+    }
+
+    async function pollAnalysis() {
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/ai/result/${state.taskId}`, { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.detail || '无法读取分析结果');
+        if (data.status === 'completed') {
+          clearInterval(state.pollTimer);
+          applyAnalysisResult(data);
+          state.status = 'ready';
+          setTaskBanner(`识别完成，共 ${state.rallies.length} 个回合`, 'success');
+          setTimeout(() => { if (state.status === 'ready') hideTaskBanner(); }, 2600);
+          renderAll();
+        } else if (data.status === 'failed') {
+          clearInterval(state.pollTimer);
+          state.status = 'error';
+          setTaskBanner('录像分析失败，请确认文件可正常播放', 'error');
+          renderAll();
+        }
+      } catch (error) {
+        clearInterval(state.pollTimer);
+        state.status = 'error';
+        setTaskBanner(error.message, 'error');
+        renderAll();
+      }
+    }
+
+    async function restoreTaskFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const taskId = params.get('task')?.trim();
+      if (!taskId) return;
+
+      state.status = 'loading';
+      setTaskBanner('正在恢复已上传的录像', 'working');
+      renderControls();
+      try {
+        const taskResponse = await fetch(`${API_BASE}/api/v1/video/task/${encodeURIComponent(taskId)}`, { cache: 'no-store' });
+        const task = await taskResponse.json();
+        if (!taskResponse.ok) throw new Error(task.detail || '找不到指定的录像任务');
+
+        state.taskId = task.task_id;
+        state.duration = Number(task.duration) || 0;
+        state.rallyPlaybackEnd = null;
+        state.status = task.status === 'processing' ? 'analyzing' : 'ready';
+        elements.videoPlayer.src = task.video_url;
+        elements.emptySource.classList.add('hidden');
+        elements.sourceName.textContent = task.filename;
+        elements.sourceDetail.textContent = `${formatTime(state.duration)} · ${state.taskId}`;
+
+        const resultResponse = await fetch(`${API_BASE}/api/v1/ai/result/${encodeURIComponent(taskId)}`, { cache: 'no-store' });
+        const result = await resultResponse.json();
+        if (!resultResponse.ok) throw new Error(result.detail || '无法读取已有分析结果');
+
+        if (result.status === 'completed') {
+          applyAnalysisResult(result);
+          state.status = 'ready';
+          setTaskBanner(`已恢复 ${state.rallies.length} 个回合`, 'success');
+          setTimeout(() => { if (state.status === 'ready') hideTaskBanner(); }, 2600);
+        } else if (result.status === 'processing') {
+          state.status = 'analyzing';
+          setTaskBanner('正在分析目标球场的发球与羽毛球轨迹', 'working');
+          clearInterval(state.pollTimer);
+          state.pollTimer = setInterval(pollAnalysis, 1400);
+        } else if (result.status === 'failed') {
+          state.status = 'error';
+          setTaskBanner('上次录像分析失败，请重新标定球场', 'error');
+        } else {
+          state.status = 'ready';
+          hideTaskBanner();
+        }
+
+        renderAll();
+        if (params.get('calibrate') === '1' && state.status !== 'analyzing') {
+          openCourtCalibration();
+        }
+      } catch (error) {
+        state.status = 'error';
+        setTaskBanner(error.message || '恢复任务失败', 'error');
+        showToast(error.message || '恢复任务失败', 'error');
+        renderAll();
+      }
+    }
+
+    function normalizedRallies() {
+      return [...state.rallies]
+        .map((item, sourceIndex) => ({ ...item, sourceIndex, start: Math.max(0, item.start), end: Math.min(state.duration, item.end) }))
+        .filter(item => item.end > item.start)
+        .sort((a, b) => a.start - b.start);
+    }
+
+    function playRally(index) {
+      const rally = state.rallies[index];
+      if (!rally) return;
+
+      const playbackEnd = Math.min(state.duration || rally.end, rally.end);
+      state.rallyPlaybackEnd = playbackEnd;
+      elements.videoPlayer.currentTime = rally.start;
+      elements.videoPlayer.play().catch(() => {
+        if (state.rallyPlaybackEnd === playbackEnd) state.rallyPlaybackEnd = null;
+      });
+    }
+
+    function renderTimeline() {
+      elements.timelineTrack.querySelectorAll('.segment').forEach(node => node.remove());
+      elements.timelineEmpty.style.display = state.rallies.length ? 'none' : 'grid';
+      if (!state.duration) return;
+
+      normalizedRallies().forEach((rally, index) => {
+        const segment = document.createElement('div');
+        segment.className = `segment${rally.confidence < 0.72 ? ' low-confidence' : ''}`;
+        segment.dataset.index = String(rally.sourceIndex);
+        segment.style.left = `${(rally.start / state.duration) * 100}%`;
+        segment.style.width = `${Math.max(0.35, ((rally.end - rally.start) / state.duration) * 100)}%`;
+        segment.title = `回合 ${index + 1} · ${formatTime(rally.start, true)} - ${formatTime(rally.end, true)} · 置信度 ${Math.round(rally.confidence * 100)}%`;
+        segment.innerHTML = '<span class="segment-handle start" data-handle="start"></span><span class="segment-handle end" data-handle="end"></span>';
+        segment.addEventListener('pointerdown', beginSegmentDrag);
+        elements.timelineTrack.appendChild(segment);
+      });
+
+      const ruler = [0, .25, .5, .75, 1].map(value => `<span>${formatTime(state.duration * value)}</span>`).join('');
+      elements.timelineRuler.innerHTML = ruler;
+    }
+
+    function beginSegmentDrag(event) {
+      if (!state.duration) return;
+      event.preventDefault();
+      const index = Number(event.currentTarget.dataset.index);
+      const rally = state.rallies[index];
+      state.drag = {
+        index,
+        mode: event.target.dataset.handle || 'move',
+        startX: event.clientX,
+        originalStart: rally.start,
+        originalEnd: rally.end,
+        moved: false,
+      };
+      event.currentTarget.classList.add('active');
+    }
+
+    function moveSegment(event) {
+      if (!state.drag) return;
+      const rect = elements.timelineTrack.getBoundingClientRect();
+      const delta = ((event.clientX - state.drag.startX) / rect.width) * state.duration;
+      if (Math.abs(delta) > 0.04) state.drag.moved = true;
+      const rally = state.rallies[state.drag.index];
+      const minDuration = 0.3;
+
+      if (state.drag.mode === 'start') {
+        rally.start = Math.max(0, Math.min(state.drag.originalEnd - minDuration, state.drag.originalStart + delta));
+      } else if (state.drag.mode === 'end') {
+        rally.end = Math.min(state.duration, Math.max(state.drag.originalStart + minDuration, state.drag.originalEnd + delta));
+      } else {
+        const duration = state.drag.originalEnd - state.drag.originalStart;
+        const nextStart = Math.max(0, Math.min(state.duration - duration, state.drag.originalStart + delta));
+        rally.start = nextStart;
+        rally.end = nextStart + duration;
+      }
+      renderTimeline();
+      syncRallyInputs(state.drag.index);
+      renderMetrics();
+    }
+
+    function finishSegmentDrag() {
+      if (!state.drag) return;
+      const drag = state.drag;
+      state.drag = null;
+      if (!drag.moved) {
+        playRally(drag.index);
+      }
+      renderAll();
+    }
+
+    function syncRallyInputs(index) {
+      const row = elements.rallyRows.querySelector(`[data-row-index="${index}"]`);
+      if (!row) return;
+      const rally = state.rallies[index];
+      row.querySelector('[data-field="start"]').value = rally.start.toFixed(2);
+      row.querySelector('[data-field="end"]').value = rally.end.toFixed(2);
+      row.querySelector('.duration-cell').textContent = `${(rally.end - rally.start).toFixed(1)}s`;
+    }
+
+    function renderRallyRows() {
+      if (!state.rallies.length) {
+        elements.rallyRows.innerHTML = '<div class="list-empty">暂无回合</div>';
+        return;
+      }
+      const sorted = normalizedRallies();
+      elements.rallyRows.innerHTML = sorted.map((rally, order) => {
+        const index = rally.sourceIndex;
+        return `
+          <div class="rally-row" data-row-index="${index}">
+            <span class="rally-index">${String(order + 1).padStart(2, '0')}</span>
+            <input class="time-input" type="number" min="0" max="${state.duration}" step="0.1" value="${rally.start.toFixed(2)}" data-field="start" aria-label="回合 ${order + 1} 开始时间">
+            <input class="time-input" type="number" min="0" max="${state.duration}" step="0.1" value="${rally.end.toFixed(2)}" data-field="end" aria-label="回合 ${order + 1} 结束时间">
+            <span class="duration-cell">${(rally.end - rally.start).toFixed(1)}s</span>
+            <span class="row-actions">
+              <button class="button button-quiet button-icon play-rally" title="播放回合" aria-label="播放回合 ${order + 1}"><i data-lucide="play"></i></button>
+              <button class="button button-quiet button-icon button-danger delete-rally" title="删除回合" aria-label="删除回合 ${order + 1}"><i data-lucide="trash-2"></i></button>
+            </span>
+          </div>`;
+      }).join('');
+
+      elements.rallyRows.querySelectorAll('.rally-row').forEach(row => {
+        const index = Number(row.dataset.rowIndex);
+        row.querySelectorAll('.time-input').forEach(input => input.addEventListener('change', event => updateRallyTime(index, event.target.dataset.field, event.target.value)));
+        row.querySelector('.play-rally').addEventListener('click', () => {
+          playRally(index);
+        });
+        row.querySelector('.delete-rally').addEventListener('click', () => {
+          state.rallies.splice(index, 1);
+          renderAll();
+        });
+      });
+      refreshIcons();
+    }
+
+    function updateRallyTime(index, field, rawValue) {
+      const value = Number(rawValue);
+      const rally = state.rallies[index];
+      if (!Number.isFinite(value)) return renderAll();
+      if (field === 'start') rally.start = Math.max(0, Math.min(value, rally.end - 0.3));
+      else rally.end = Math.min(state.duration, Math.max(value, rally.start + 0.3));
+      renderAll();
+    }
+
+    function renderMetrics() {
+      const rallies = normalizedRallies();
+      const selected = rallies.reduce((total, item) => total + item.end - item.start, 0);
+      const preBuffer = Number(document.getElementById('preBuffer').value) || 0;
+      const postBuffer = Number(document.getElementById('postBuffer').value) || 0;
+      const projected = rallies.map(item => ({
+        start: Math.max(0, item.start - preBuffer),
+        end: Math.min(state.duration, item.end + postBuffer),
+      })).reduce((merged, item) => {
+        const previous = merged[merged.length - 1];
+        if (previous && item.start <= previous.end) previous.end = Math.max(previous.end, item.end);
+        else merged.push({ ...item });
+        return merged;
+      }, []);
+      const projectedDuration = projected.reduce((total, item) => total + item.end - item.start, 0);
+      const reduction = state.duration ? Math.max(0, Math.round((1 - projectedDuration / state.duration) * 100)) : 0;
+      elements.originalDuration.textContent = formatTime(state.duration);
+      elements.selectedDuration.textContent = formatTime(projectedDuration);
+      elements.reductionRate.textContent = `${reduction}%`;
+      elements.exportSummary.textContent = state.rallies.length
+        ? `${state.rallies.length} 个回合 · ${formatTime(selected)} 净时长 · ${formatTime(projectedDuration)} 成片`
+        : '完成分析后即可导出';
+    }
+
+    function renderControls() {
+      const ready = Boolean(state.taskId && state.rallies.length && state.status !== 'uploading' && state.status !== 'analyzing' && state.status !== 'exporting');
+      elements.addRallyButton.disabled = !state.duration || !state.taskId;
+      elements.calibrateCourtButton.disabled = !state.taskId || ['uploading', 'analyzing', 'exporting'].includes(state.status);
+      elements.exportButton.disabled = !ready;
+    }
+
+    function renderAll() {
+      renderTimeline();
+      renderRallyRows();
+      renderMetrics();
+      renderControls();
+    }
+
+    function addRally() {
+      if (!state.duration) return;
+      const start = Math.min(elements.videoPlayer.currentTime || 0, Math.max(0, state.duration - 0.5));
+      const end = Math.min(state.duration, start + 6);
+      state.rallies.push({ id: Date.now(), start, end, confidence: 1 });
+      renderAll();
+    }
+
+    async function exportVideo() {
+      if (!state.taskId || !state.rallies.length) return;
+      state.status = 'exporting';
+      elements.exportResult.classList.remove('visible');
+      elements.exportButtonText.textContent = '正在生成';
+      elements.exportButton.querySelector('svg')?.classList.add('spin');
+      setTaskBanner('正在剪辑、编码并合并回合', 'working');
+      renderControls();
+
+      const payload = {
+        rallies: normalizedRallies().map(item => ({ start: Number(item.start.toFixed(3)), end: Number(item.end.toFixed(3)) })),
+        export_type: document.querySelector('input[name="exportType"]:checked').value,
+        resolution: document.querySelector('input[name="resolution"]:checked').value,
+        codec: document.querySelector('input[name="codec"]:checked').value,
+        crf: Number(elements.crfRange.value),
+        pre_buffer: Number(document.getElementById('preBuffer').value),
+        post_buffer: Number(document.getElementById('postBuffer').value),
+      };
+
+      try {
+        const response = await fetch(`${API_BASE}/api/v1/video/export/${state.taskId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        if (!response.ok) {
+          let detail = '导出失败';
+          try { detail = (await response.json()).detail || detail; } catch { /* no-op */ }
+          throw new Error(detail);
+        }
+        const blob = await response.blob();
+        if (state.exportObjectUrl) URL.revokeObjectURL(state.exportObjectUrl);
+        state.exportObjectUrl = URL.createObjectURL(blob);
+        const filename = response.headers.get('X-Export-Filename') || `badminton_highlight.${payload.export_type === 'zip' ? 'zip' : 'mp4'}`;
+        const fileSizeMb = Number(response.headers.get('X-File-Size-MB')) || blob.size / 1024 / 1024;
+        state.status = 'ready';
+        elements.exportResultMeta.textContent = `${payload.resolution.toUpperCase()} · ${payload.codec.toUpperCase()} · ${fileSizeMb.toFixed(2)} MB`;
+        elements.downloadLink.href = state.exportObjectUrl;
+        elements.downloadLink.download = filename;
+        elements.exportResult.classList.add('visible');
+        setTaskBanner('视频已生成，可以下载', 'success');
+        setTimeout(() => { if (state.status === 'ready') hideTaskBanner(); }, 2600);
+      } catch (error) {
+        state.status = 'ready';
+        setTaskBanner(error.message || '导出失败', 'error');
+        showToast(error.message || '导出失败', 'error');
+      } finally {
+        elements.exportButtonText.textContent = '生成剪辑';
+        elements.exportButton.querySelector('svg')?.classList.remove('spin');
+        renderControls();
+        refreshIcons();
+      }
+    }
+
+    elements.videoInput.addEventListener('change', event => handleFile(event.target.files[0]));
+    elements.addRallyButton.addEventListener('click', addRally);
+    elements.calibrateCourtButton.addEventListener('click', openCourtCalibration);
+    elements.resetCourtButton.addEventListener('click', () => {
+      state.courtRoi = DEFAULT_COURT_ROI.map(point => ({ ...point }));
+      renderCourtOverlay();
+    });
+    elements.confirmCourtButton.addEventListener('click', async () => {
+      try {
+        await startAnalysis();
+      } catch (error) {
+        state.status = 'error';
+        setTaskBanner(error.message || '分析任务启动失败', 'error');
+        renderControls();
+      }
+    });
+    elements.exportButton.addEventListener('click', exportVideo);
+    elements.crfRange.addEventListener('input', () => { elements.crfValue.textContent = elements.crfRange.value; });
+    ['preBuffer', 'postBuffer'].forEach(id => document.getElementById(id).addEventListener('change', renderMetrics));
+    elements.videoPlayer.addEventListener('loadedmetadata', () => {
+      if (!state.duration && Number.isFinite(elements.videoPlayer.duration)) {
+        state.duration = elements.videoPlayer.duration;
+        renderAll();
+      }
+      updateCourtOverlayBounds();
+    });
+    elements.videoPlayer.addEventListener('timeupdate', () => {
+      const percent = state.duration ? (elements.videoPlayer.currentTime / state.duration) * 100 : 0;
+      elements.timelineProgress.style.width = `${Math.min(100, percent)}%`;
+      if (state.rallyPlaybackEnd !== null && elements.videoPlayer.currentTime >= state.rallyPlaybackEnd - 0.03) {
+        const rallyEnd = state.rallyPlaybackEnd;
+        state.rallyPlaybackEnd = null;
+        elements.videoPlayer.pause();
+        elements.videoPlayer.currentTime = rallyEnd;
+      }
+    });
+    elements.videoPlayer.addEventListener('ended', () => { state.rallyPlaybackEnd = null; });
+
+    ['dragenter', 'dragover'].forEach(name => elements.videoStage.addEventListener(name, event => {
+      event.preventDefault();
+      elements.videoStage.classList.add('dragging');
+    }));
+    ['dragleave', 'drop'].forEach(name => elements.videoStage.addEventListener(name, event => {
+      event.preventDefault();
+      elements.videoStage.classList.remove('dragging');
+    }));
+    elements.videoStage.addEventListener('drop', event => handleFile(event.dataTransfer.files[0]));
+    document.addEventListener('pointermove', event => {
+      moveSegment(event);
+      moveCourtHandle(event);
+    });
+    document.addEventListener('pointerup', () => {
+      finishSegmentDrag();
+      state.courtDragIndex = null;
+    });
+    window.addEventListener('resize', updateCourtOverlayBounds);
+
+    refreshIcons();
+    checkApi();
+    renderAll();
+    restoreTaskFromUrl();
+  </script>
+</body>
+</html>
