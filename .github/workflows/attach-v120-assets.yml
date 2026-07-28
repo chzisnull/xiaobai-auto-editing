@@ -1,0 +1,125 @@
+name: Attach v1.2.0 release assets
+
+# One-shot: pull already-built Win/mac artifacts from the failed release run,
+# rebuild Android on Actions, then publish a complete v1.2.0 release.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  attach:
+    name: Attach installers to v1.2.0
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: v1.2.0
+
+      - name: Download Windows artifact from run 30343089867
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: release-assets/windows
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 30343089867
+
+      - name: Download macOS artifact from run 30343089867
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-installer
+          path: release-assets/macos
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 30343089867
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Build Android debug APK
+        working-directory: android
+        run: |
+          set -euo pipefail
+          # Prefer official Maven repos (Aliyun first caused CI 502 earlier).
+          cat > settings.gradle.kts <<'EOF'
+          pluginManagement {
+              repositories {
+                  google()
+                  mavenCentral()
+                  gradlePluginPortal()
+              }
+          }
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
+          rootProject.name = "XiaobaiAutoEditing"
+          include(":app")
+          EOF
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon
+          mkdir -p ../release-assets/android
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            ../release-assets/android/XiaobaiAutoEditing-1.2.0-android-debug.apk
+
+      - name: List assets
+        run: find release-assets -type f -exec ls -lh {} \;
+
+      - name: Publish / update GitHub Release v1.2.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Delete draft/broken releases named v1.2.0 if present, keep the git tag.
+          if gh release view v1.2.0 >/dev/null 2>&1; then
+            gh release delete v1.2.0 --yes || true
+          fi
+          # Also clean untagged drafts titled v1.2.0
+          for id in $(gh api repos/${{ github.repository }}/releases --jq '.[] | select(.draft==true and (.name|test("1.2.0"))) | .id'); do
+            gh api -X DELETE "repos/${{ github.repository }}/releases/$id" || true
+          done
+
+          gh release create v1.2.0 \
+            --title "小白自动剪辑 v1.2.0" \
+            --notes "$(cat <<'EOF'
+          ## 全平台安装包
+
+          本版本同时提供 **Windows / macOS / Android** 安装包。
+
+          ### Windows
+          - 下载 `XiaobaiAutoEditing-1.2.0-Windows-Setup.exe` 并运行安装
+          - 已内置 FFmpeg / FFprobe
+
+          ### macOS（Apple Silicon）
+          - 下载 `XiaobaiAutoEditing-1.2.0-macOS-arm64.dmg`，将应用拖入「应用程序」
+          - 未使用 Apple 开发者证书签名：首次启动请按住 Control 点击应用并选择「打开」
+          - 需要本机安装 FFmpeg：`brew install ffmpeg`
+
+          ### Android（端侧预览）
+          - 下载 `XiaobaiAutoEditing-1.2.0-android-debug.apk` 直接安装
+          - 需允许「安装未知来源应用」
+          - **分析与导出均在手机本地完成**，不上传服务器
+
+          ---
+
+          Windows / macOS 构建自 Actions run 30343089867；Android 在本 workflow 内重建（修复 Maven 镜像 502）。
+          EOF
+          )" \
+            release-assets/windows/*.exe \
+            release-assets/macos/*.dmg \
+            release-assets/android/*.apk
+
+          gh release view v1.2.0 --json url,assets --jq '{url, assets: [.assets[] | {name, size}]}'

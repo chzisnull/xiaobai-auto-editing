@@ -1,0 +1,34 @@
+name: Attach macOS to v1.2.0
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  attach-macos:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download macOS artifact from release CI run
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-installer
+          path: assets
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 30343089867
+
+      - name: List
+        run: ls -lh assets/
+
+      - name: Upload DMG to release v1.2.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          FILE=$(ls assets/*.dmg | head -1)
+          echo "Uploading $FILE"
+          gh release upload v1.2.0 "$FILE" --repo "${{ github.repository }}" --clobber
+          gh release view v1.2.0 --repo "${{ github.repository }}" --json assets --jq '.assets[] | {name, size}'
