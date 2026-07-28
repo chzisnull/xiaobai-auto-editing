@@ -99,7 +99,14 @@ class AudioVisualRallyDetector(BaseRallyDetector):
             raw_rallies = self._run_visual_only_fsm(motion_timestamps, motion_energies)
 
         raw_rallies = self._refine_rally_boundaries(video_path, raw_rallies)
-        return self._format_and_validate_rallies(raw_rallies)
+        return self._format_and_validate_rallies(
+            raw_rallies,
+            merge_gap_threshold=self._rally_merge_gap_threshold(),
+        )
+
+    def _rally_merge_gap_threshold(self) -> float:
+        """Adjacent-fragment merge gap used after FSM / boundary refinement."""
+        return 0.5
 
     def _refine_rally_boundaries(
         self,

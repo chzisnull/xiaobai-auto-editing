@@ -1,7 +1,11 @@
 """TrackNetV3 shuttle trajectory inference for rally boundary refinement.
 
 The network architecture is adapted from qaz812345/TrackNetV3 (MIT License).
-Only short windows around audio/motion rally boundaries are inferred here.
+Bundled open weights ship with this repo — no paid API required.
+
+Inference modes (TRACKNET_MODE):
+  - boundary: short windows around first/last hit (default, fast)
+  - candidate: full candidate span + pad (slower, optional precision mode)
 """
 
 from dataclasses import dataclass
@@ -92,16 +96,32 @@ class TrackNetV3BoundaryRefiner:
         self,
         model_path: Optional[str] = None,
         batch_size: int = 4,
-        pre_window: float = 2.7,
-        post_window: float = 2.8,
+        pre_window: float = 3.2,
+        post_window: float = 3.4,
         threshold: float = 0.5,
+        mode: Optional[str] = None,
+        candidate_pad_pre: float = 1.5,
+        candidate_pad_post: float = 2.0,
     ) -> None:
         default_path = Path(__file__).resolve().parents[2] / "model_assets" / "tracknetv3_track.pt"
         self.model_path = Path(model_path or os.getenv("TRACKNET_MODEL_PATH", default_path))
         self.batch_size = max(1, min(int(batch_size), 8))
-        self.pre_window = max(1.0, min(float(pre_window), 4.0))
-        self.post_window = max(1.0, min(float(post_window), 4.0))
+        # Wider windows recover serve toss / late landing when audio cuts early.
+        self.pre_window = max(1.0, min(float(pre_window), 5.0))
+        self.post_window = max(1.0, min(float(post_window), 5.0))
         self.threshold = max(0.1, min(float(threshold), 0.9))
+        # Default to boundary for interactive desktop/web speed. Users can opt into
+        # TRACKNET_MODE=candidate when they want slower, denser trajectory coverage.
+        requested_mode = (mode or os.getenv("TRACKNET_MODE", "boundary")).strip().lower()
+        self.mode = requested_mode if requested_mode in {"boundary", "candidate"} else "boundary"
+        self.candidate_pad_pre = max(
+            0.5,
+            min(float(os.getenv("TRACKNET_CANDIDATE_PAD_PRE", candidate_pad_pre)), 4.0),
+        )
+        self.candidate_pad_post = max(
+            0.5,
+            min(float(os.getenv("TRACKNET_CANDIDATE_PAD_POST", candidate_pad_post)), 5.0),
+        )
         self._model = None
         self._torch = None
         self._device = None
@@ -284,26 +304,64 @@ class TrackNetV3BoundaryRefiner:
         margin = 0.08
         return min(xs) - margin <= point.x <= max(xs) + margin and 0.02 <= point.y <= max(ys) + margin
 
+    def _candidate_windows(
+        self,
+        rallies: List[Dict[str, Any]],
+    ) -> List[Tuple[float, float]]:
+        windows: List[Tuple[float, float]] = []
+        if self.mode == "boundary":
+            for rally in rallies:
+                first_hit = float(rally.get("first_hit", rally["start"]))
+                last_hit = float(rally.get("last_hit", rally["end"]))
+                windows.append((first_hit - self.pre_window, first_hit + 0.45))
+                windows.append((last_hit - 0.15, last_hit + self.post_window))
+            return self._merge_windows(windows)
+
+        for rally in rallies:
+            start = float(rally["start"]) - self.candidate_pad_pre
+            end = float(rally["end"]) + self.candidate_pad_post
+            # Always cover serve lead-in / landing even if coarse start/end are tight.
+            first_hit = float(rally.get("first_hit", rally["start"]))
+            last_hit = float(rally.get("last_hit", rally["end"]))
+            start = min(start, first_hit - self.pre_window * 0.7)
+            end = max(end, last_hit + self.post_window * 0.7)
+            windows.append((max(0.0, start), end))
+        return self._merge_windows(windows)
+
+    def track_points(
+        self,
+        video_path: str,
+        rallies: List[Dict[str, Any]],
+        court_roi: Sequence[Sequence[float]],
+    ) -> Tuple[float, List[TrajectoryPoint]]:
+        """Infer shuttle points for candidate (or boundary) windows."""
+        if not self.available or not rallies:
+            return 30.0, []
+        merged_windows = self._candidate_windows(rallies)
+        fps, frame_windows = self._read_window_frames(video_path, merged_windows)
+        points = [
+            point for point in self._predict_points(fps, frame_windows)
+            if self._inside_target_span(point, court_roi)
+        ]
+        logger.info(
+            "TrackNetV3 mode=%s windows=%d points=%d",
+            self.mode,
+            len(merged_windows),
+            len(points),
+        )
+        return fps, points
+
     def refine(
         self,
         video_path: str,
         rallies: List[Dict[str, Any]],
         court_roi: Sequence[Sequence[float]],
     ) -> List[Dict[str, Any]]:
+        """Legacy boundary-only refine kept for tests and fallback path."""
         if not self.available:
             return rallies
-        windows: List[Tuple[float, float]] = []
-        for rally in rallies:
-            first_hit = float(rally.get("first_hit", rally["start"]))
-            last_hit = float(rally.get("last_hit", rally["end"]))
-            windows.append((first_hit - self.pre_window, first_hit + 0.45))
-            windows.append((last_hit - 0.15, last_hit + self.post_window))
-        merged_windows = self._merge_windows(windows)
-        fps, frame_windows = self._read_window_frames(video_path, merged_windows)
-        points = [
-            point for point in self._predict_points(fps, frame_windows)
-            if self._inside_target_span(point, court_roi)
-        ]
+        fps, points = self.track_points(video_path, rallies, court_roi)
+        del fps  # points already time-stamped
 
         refined: List[Dict[str, Any]] = []
         for rally in rallies:
@@ -311,7 +369,10 @@ class TrackNetV3BoundaryRefiner:
             first_hit = float(item.get("first_hit", item["start"]))
             last_hit = float(item.get("last_hit", item["end"]))
 
-            start_points = [point for point in points if first_hit - self.pre_window <= point.time <= first_hit + 0.25]
+            start_points = [
+                point for point in points
+                if first_hit - self.pre_window <= point.time <= first_hit + 0.25
+            ]
             start_clusters = [
                 cluster for cluster in self._trajectory_clusters(start_points)
                 if self._is_moving_trajectory(cluster)
@@ -321,7 +382,10 @@ class TrackNetV3BoundaryRefiner:
                 trajectory_start = max(0.0, candidates[-1][0].time - 0.3)
                 item["start"] = min(float(item["start"]), trajectory_start)
 
-            end_points = [point for point in points if last_hit - 0.1 <= point.time <= last_hit + self.post_window]
+            end_points = [
+                point for point in points
+                if last_hit - 0.1 <= point.time <= last_hit + self.post_window
+            ]
             end_clusters = [
                 cluster for cluster in self._trajectory_clusters(end_points)
                 if self._is_moving_trajectory(cluster)
