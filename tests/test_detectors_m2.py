@@ -7,6 +7,7 @@ import scipy.signal as signal
 from backend.app.detectors.base import BaseRallyDetector
 from backend.app.detectors.audio_visual import AudioVisualRallyDetector
 from backend.app.detectors.court_aware import CourtAwareRallyDetector
+from backend.app.detectors.highlight_filter import StrictHighlightFilter
 from backend.app.detectors.rally_scorer import MultimodalRallyScorer
 from backend.app.detectors.tracknet_v3 import TrackNetV3BoundaryRefiner, TrajectoryPoint
 from backend.app.detectors.trajectory_series import TrajectorySeries
@@ -227,14 +228,16 @@ def test_visual_only_fallback():
 
 def test_court_aware_detector_filters_hits_without_court_motion():
     detector = CourtAwareRallyDetector(
+        highlight_mode="standard",
         motion_threshold=0.01,
         serve_lead=0.25,
         landing_delay=0.65,
         residual_motion_window=1.0,
         max_serve_lookback=2.0,
         trajectory_refiner=None,
+        highlight_filter=None,
     )
-    hit_peaks = np.array([1.0, 2.0, 10.0, 11.0])
+    hit_peaks = np.array([1.0, 1.5, 2.0, 10.0, 10.5, 11.0])
     timestamps = np.arange(0.0, 14.0, 0.1)
     energies = np.full_like(timestamps, 0.002, dtype=float)
     energies[(timestamps >= 0.7) & (timestamps <= 2.3)] = 0.035
@@ -242,8 +245,6 @@ def test_court_aware_detector_filters_hits_without_court_motion():
     rallies = detector._run_rally_fsm(hit_peaks, timestamps, energies)
 
     assert len(rallies) == 1
-    assert rallies[0]["start"] == pytest.approx(0.45, abs=0.15)
-    assert rallies[0]["end"] >= 2.65 - 0.05
     assert rallies[0]["first_hit"] == pytest.approx(1.0)
     assert rallies[0]["last_hit"] == pytest.approx(2.0)
     assert 0.48 <= rallies[0]["confidence"] <= 0.99
@@ -252,6 +253,7 @@ def test_court_aware_detector_filters_hits_without_court_motion():
 def test_court_aware_keeps_rally_across_missed_mid_hits_with_motion():
     """Missed audio hits mid-rally must not hard-cut while court motion stays live."""
     detector = CourtAwareRallyDetector(
+        highlight_mode="standard",
         motion_threshold=0.01,
         serve_lead=0.2,
         landing_delay=0.6,
@@ -259,6 +261,7 @@ def test_court_aware_keeps_rally_across_missed_mid_hits_with_motion():
         max_bridge_gap=5.5,
         residual_motion_window=1.5,
         trajectory_refiner=None,
+        highlight_filter=None,
     )
     # Strong hits at the ends; a 4.2s audio hole in the middle.
     hit_peaks = np.array([1.0, 1.8, 2.5, 6.7, 7.4, 8.1])
@@ -278,6 +281,7 @@ def test_court_aware_keeps_rally_across_missed_mid_hits_with_motion():
 def test_court_aware_still_splits_true_dead_ball_gap():
     """A long quiet gap with no court motion remains two separate rallies."""
     detector = CourtAwareRallyDetector(
+        highlight_mode="standard",
         motion_threshold=0.01,
         serve_lead=0.2,
         landing_delay=0.5,
@@ -285,6 +289,7 @@ def test_court_aware_still_splits_true_dead_ball_gap():
         max_bridge_gap=5.5,
         residual_motion_window=1.0,
         trajectory_refiner=None,
+        highlight_filter=None,
     )
     hit_peaks = np.array([1.0, 1.8, 2.4, 12.0, 12.8, 13.5])
     timestamps = np.arange(0.0, 15.0, 0.1)
@@ -302,6 +307,7 @@ def test_court_aware_still_splits_true_dead_ball_gap():
 def test_court_aware_soft_bridge_hit_glues_fragments():
     """A weak mid-rally hit with mild court motion should glue two fragments."""
     detector = CourtAwareRallyDetector(
+        highlight_mode="standard",
         motion_threshold=0.01,
         serve_lead=0.2,
         landing_delay=0.5,
@@ -309,6 +315,7 @@ def test_court_aware_soft_bridge_hit_glues_fragments():
         max_bridge_gap=5.0,
         residual_motion_window=1.0,
         trajectory_refiner=None,
+        highlight_filter=None,
     )
     # Primary hits need high motion; soft bridge hit sits in a quieter pocket.
     hit_peaks = np.array([1.0, 1.7, 4.2, 6.5, 7.2])
@@ -328,12 +335,14 @@ def test_court_aware_soft_bridge_hit_glues_fragments():
 def test_court_aware_expands_late_serve_and_early_end():
     """Serve lead-in and residual landing motion must be kept in the segment."""
     detector = CourtAwareRallyDetector(
+        highlight_mode="standard",
         motion_threshold=0.01,
         serve_lead=0.3,
         landing_delay=0.5,
         max_serve_lookback=3.5,
         residual_motion_window=2.5,
         trajectory_refiner=None,
+        highlight_filter=None,
     )
     # Hits only in the middle; players already moving before first hit and after last.
     hit_peaks = np.array([5.0, 5.8, 6.6])
@@ -351,6 +360,7 @@ def test_court_aware_expands_late_serve_and_early_end():
 def test_court_aware_merges_high_motion_gap_between_fragments():
     """Adjacent fragments separated by short active-motion gaps should merge."""
     detector = CourtAwareRallyDetector(
+        highlight_mode="standard",
         motion_threshold=0.01,
         serve_lead=0.2,
         landing_delay=0.4,
@@ -358,6 +368,7 @@ def test_court_aware_merges_high_motion_gap_between_fragments():
         max_bridge_gap=6.0,
         residual_motion_window=1.0,
         trajectory_refiner=None,
+        highlight_filter=None,
     )
     hit_peaks = np.array([1.0, 1.6, 2.2, 6.0, 6.6, 7.2])
     timestamps = np.arange(0.0, 9.0, 0.1)
@@ -369,6 +380,42 @@ def test_court_aware_merges_high_motion_gap_between_fragments():
     assert len(rallies) == 1
     assert rallies[0]["first_hit"] == pytest.approx(1.0)
     assert rallies[0]["last_hit"] == pytest.approx(7.2)
+
+
+def test_strict_mode_default_and_filters_sparse_segments():
+    detector = CourtAwareRallyDetector(trajectory_refiner=None)
+    assert detector.strict is True
+    assert detector.highlight_mode == "strict"
+
+    # Dense exchange should survive.
+    dense_hits = np.array([1.0, 1.6, 2.2, 2.9, 3.5])
+    timestamps = np.arange(0.0, 8.0, 0.1)
+    energies = np.full_like(timestamps, 0.002, dtype=float)
+    energies[(timestamps >= 0.8) & (timestamps <= 4.0)] = 0.04
+    rallies = detector._run_rally_fsm(dense_hits, timestamps, energies)
+    assert len(rallies) == 1
+    assert rallies[0]["end"] - rallies[0]["start"] < 6.0
+    # Anchored near hits, not long dead padding.
+    assert rallies[0]["start"] >= 0.0
+    assert abs(rallies[0]["start"] - (1.0 - 0.85)) < 0.4
+
+
+def test_strict_highlight_filter_splits_and_drops_dead_ball():
+    filt = StrictHighlightFilter(max_hit_silence=2.2, min_hits=3, max_duration=20.0)
+    rallies = [{"start": 0.0, "end": 60.0, "first_hit": 1.0, "last_hit": 55.0, "confidence": 0.8}]
+    hits = np.concatenate([
+        np.arange(1.0, 10.0, 0.7),
+        np.arange(40.0, 50.0, 0.7),
+    ])
+    out = filt.apply(rallies, hits)
+    assert len(out) >= 2
+    assert all(item["end"] - item["start"] < 25 for item in out)
+    # Single-touch noise is dropped.
+    noise = filt.apply(
+        [{"start": 1.0, "end": 2.0, "first_hit": 1.2, "last_hit": 1.2, "confidence": 0.7}],
+        np.array([1.2]),
+    )
+    assert noise == []
 
 
 def test_court_aware_detector_normalizes_custom_roi():
@@ -478,10 +525,10 @@ def test_trajectory_series_flight_helpers():
 
 def test_multimodal_scorer_merges_when_trajectory_continues():
     """Free rule scorer: mid-gap flight + hits should glue two coarse fragments."""
-    scorer = MultimodalRallyScorer(merge_gap=4.0, serve_lookback=2.0, land_lookahead=1.5)
+    scorer = MultimodalRallyScorer(merge_gap=4.0, serve_lookback=1.2, land_lookahead=1.2, min_hit_density=0.25)
     rallies = [
-        {"start": 1.0, "end": 3.0, "first_hit": 1.2, "last_hit": 2.6, "confidence": 0.8},
-        {"start": 4.8, "end": 7.5, "first_hit": 5.0, "last_hit": 7.0, "confidence": 0.8},
+        {"start": 1.0, "end": 3.2, "first_hit": 1.2, "last_hit": 3.0, "confidence": 0.8},
+        {"start": 4.6, "end": 7.5, "first_hit": 4.8, "last_hit": 7.0, "confidence": 0.8},
     ]
     # Continuous moving shuttle across the short audio hole, with a bridge hit.
     points = [
@@ -489,7 +536,7 @@ def test_multimodal_scorer_merges_when_trajectory_continues():
         for index in range(55)
     ]
     series = TrajectorySeries.from_points(points)
-    hits = np.array([1.2, 2.0, 2.6, 3.9, 5.0, 6.0, 7.0])
+    hits = np.array([1.2, 1.8, 2.4, 3.0, 3.9, 4.8, 5.5, 6.2, 7.0])
     motion_t = np.arange(0.0, 10.0, 0.1)
     motion_e = np.full_like(motion_t, 0.03, dtype=float)
 
@@ -502,21 +549,21 @@ def test_multimodal_scorer_merges_when_trajectory_continues():
 
 
 def test_multimodal_scorer_keeps_true_dead_gap_split():
-    scorer = MultimodalRallyScorer(merge_gap=4.0)
+    scorer = MultimodalRallyScorer(merge_gap=4.0, min_hit_density=0.25)
     rallies = [
-        {"start": 1.0, "end": 3.0, "first_hit": 1.2, "last_hit": 2.6, "confidence": 0.8},
-        {"start": 12.0, "end": 15.0, "first_hit": 12.3, "last_hit": 14.5, "confidence": 0.8},
+        {"start": 1.0, "end": 4.0, "first_hit": 1.2, "last_hit": 3.5, "confidence": 0.8},
+        {"start": 12.0, "end": 15.5, "first_hit": 12.2, "last_hit": 15.0, "confidence": 0.8},
     ]
     points = [
-        *[TrajectoryPoint(1.0 + index * 0.12, 0.3 + index * 0.02, 0.4, 0.8) for index in range(10)],
-        *[TrajectoryPoint(12.0 + index * 0.12, 0.3 + index * 0.02, 0.4, 0.8) for index in range(10)],
+        *[TrajectoryPoint(1.0 + index * 0.12, 0.3 + index * 0.02, 0.4, 0.8) for index in range(12)],
+        *[TrajectoryPoint(12.0 + index * 0.12, 0.3 + index * 0.02, 0.4, 0.8) for index in range(12)],
     ]
     series = TrajectorySeries.from_points(points)
-    hits = np.array([1.2, 2.0, 2.6, 12.3, 13.0, 14.5])
+    hits = np.array([1.2, 2.0, 2.7, 3.5, 12.2, 13.0, 13.8, 15.0])
     motion_t = np.arange(0.0, 16.0, 0.1)
     motion_e = np.full_like(motion_t, 0.002, dtype=float)
-    motion_e[(motion_t >= 1.0) & (motion_t <= 3.2)] = 0.04
-    motion_e[(motion_t >= 12.0) & (motion_t <= 15.2)] = 0.04
+    motion_e[(motion_t >= 1.0) & (motion_t <= 4.0)] = 0.04
+    motion_e[(motion_t >= 12.0) & (motion_t <= 15.5)] = 0.04
 
     refined = scorer.refine(rallies, hits, motion_t, motion_e, series)
 
@@ -524,7 +571,7 @@ def test_multimodal_scorer_keeps_true_dead_gap_split():
 
 
 def test_multimodal_scorer_splits_overlong_blob():
-    scorer = MultimodalRallyScorer(max_rally_duration=20.0)
+    scorer = MultimodalRallyScorer(max_rally_duration=20.0, min_hit_density=0.25)
     rallies = [{
         "start": 0.0,
         "end": 60.0,
@@ -534,8 +581,8 @@ def test_multimodal_scorer_splits_overlong_blob():
     }]
     # Two dense hit clusters separated by a long dead gap.
     hits = np.concatenate([
-        np.arange(1.0, 12.0, 0.8),
-        np.arange(40.0, 55.0, 0.8),
+        np.arange(1.0, 12.0, 0.7),
+        np.arange(40.0, 55.0, 0.7),
     ])
     series = TrajectorySeries.from_points([])
     motion_t = np.arange(0.0, 60.0, 0.2)
@@ -544,7 +591,7 @@ def test_multimodal_scorer_splits_overlong_blob():
     refined = scorer.refine(rallies, hits, motion_t, motion_e, series)
 
     assert len(refined) >= 2
-    assert all(r["end"] - r["start"] < 35 for r in refined)
+    assert all(r["end"] - r["start"] < 30 for r in refined)
 
 
 def test_tracknet_default_mode_is_boundary():

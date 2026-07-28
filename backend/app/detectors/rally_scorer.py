@@ -29,12 +29,12 @@ class MultimodalRallyScorer:
 
     def __init__(
         self,
-        merge_gap: float = 4.0,
-        serve_lookback: float = 2.2,
-        land_lookahead: float = 1.8,
+        merge_gap: float = 3.5,
+        serve_lookback: float = 1.2,
+        land_lookahead: float = 1.2,
         review_threshold: float = 0.58,
-        max_rally_duration: float = 28.0,
-        min_hit_density: float = 0.18,
+        max_rally_duration: float = 20.0,
+        min_hit_density: float = 0.32,
     ) -> None:
         self.merge_gap = max(1.0, float(merge_gap))
         self.serve_lookback = max(0.5, float(serve_lookback))
@@ -76,14 +76,19 @@ class MultimodalRallyScorer:
             item["score_keep"] = scores["keep"]
             item["needs_review"] = bool(scores["confidence"] < self.review_threshold)
             duration = float(item["end"]) - float(item["start"])
-            hit_count = self._hit_count(hits, float(item["start"]), float(item["end"]))
-            hit_density = hit_count / max(0.2, duration)
+            first_hit = float(item.get("first_hit", item["start"]))
+            last_hit = float(item.get("last_hit", item["end"]))
+            hit_count = self._hit_count(hits, first_hit, last_hit)
+            hit_span = max(0.25, last_hit - first_hit)
+            hit_density = hit_count / hit_span
             # Drop sparse pseudo-rallies that are mostly walking/noise.
-            if duration < 0.9:
+            if duration < 1.2:
                 continue
-            if hit_count < 2 and scores["keep"] < 0.45:
+            if hit_count < 3:
                 continue
-            if duration >= 8.0 and hit_density < self.min_hit_density and scores["keep"] < 0.50:
+            if hit_density < self.min_hit_density and hit_count < 5:
+                continue
+            if duration >= 10.0 and hit_density < self.min_hit_density:
                 continue
             scored.append(item)
         return scored
@@ -107,11 +112,11 @@ class MultimodalRallyScorer:
                 last_hit = float(inside[-1])
 
         # Keep a short serve lead and landing tail only.
-        start = max(start, first_hit - min(self.serve_lookback, 2.0))
-        end = min(end, last_hit + min(self.land_lookahead, 1.6))
-        # Never keep more than ~2.2s before first hit or ~1.8s after last hit.
-        start = max(start, first_hit - 2.2)
-        end = min(end, last_hit + 1.8)
+        start = max(start, first_hit - min(self.serve_lookback, 1.2))
+        end = min(end, last_hit + min(self.land_lookahead, 1.2))
+        # Never keep more than ~1.2s before first hit or ~1.2s after last hit.
+        start = max(start, first_hit - 1.2)
+        end = min(end, last_hit + 1.2)
 
         rally["first_hit"] = first_hit
         rally["last_hit"] = last_hit

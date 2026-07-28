@@ -40,6 +40,57 @@ def _sqlite_url(path: Path) -> str:
     return f"sqlite:///{path.as_posix()}"
 
 
+def ensure_stdio(app_data: Path) -> Path:
+    """PyInstaller windowed builds set stdout/stderr to None on Windows.
+
+    uvicorn's default ColorFormatter calls stream.isatty(), which crashes when
+    those streams are missing. Point them at a local log file instead.
+    """
+    log_path = app_data / "desktop.log"
+    if sys.stdout is None or sys.stderr is None or not hasattr(sys.stdout, "isatty"):
+        log_file = open(log_path, "a", encoding="utf-8", buffering=1)
+        if sys.stdout is None or not hasattr(sys.stdout, "isatty"):
+            sys.stdout = log_file
+        if sys.stderr is None or not hasattr(sys.stderr, "isatty"):
+            sys.stderr = log_file
+    return log_path
+
+
+def uvicorn_log_config() -> dict:
+    """Plain logging config that does not depend on color/TTY detection."""
+    return {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": {
+            "default": {
+                "()": "logging.Formatter",
+                "fmt": "%(levelname)s: %(message)s",
+            },
+            "access": {
+                "()": "logging.Formatter",
+                "fmt": '%(levelname)s: %(client_addr)s - "%(request_line)s" %(status_code)s',
+            },
+        },
+        "handlers": {
+            "default": {
+                "formatter": "default",
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stderr",
+            },
+            "access": {
+                "formatter": "access",
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stderr",
+            },
+        },
+        "loggers": {
+            "uvicorn": {"handlers": ["default"], "level": "WARNING", "propagate": False},
+            "uvicorn.error": {"handlers": ["default"], "level": "WARNING", "propagate": False},
+            "uvicorn.access": {"handlers": ["access"], "level": "WARNING", "propagate": False},
+        },
+    }
+
+
 def configure_runtime() -> Path:
     """Set writable desktop paths before importing the FastAPI application."""
     app_data = user_data_dir()
@@ -47,12 +98,14 @@ def configure_runtime() -> Path:
     exports = app_data / "exports"
     uploads.mkdir(exist_ok=True)
     exports.mkdir(exist_ok=True)
+    ensure_stdio(app_data)
 
     os.environ.setdefault("DATABASE_URL", _sqlite_url(app_data / "xiaobai.db"))
     os.environ.setdefault("UPLOAD_DIR", str(uploads))
     os.environ.setdefault("EXPORTS_DIR", str(exports))
     os.environ.setdefault("DELETE_SOURCE_AFTER_EXPORT", "true")
     os.environ.setdefault("TRACKNET_DEVICE", "auto")
+    os.environ.setdefault("RALLY_MODE", "strict")
 
     # Finder and Explorer start apps with a minimal PATH. Include common FFmpeg locations.
     root = resource_root()
@@ -82,7 +135,14 @@ class LocalServer:
         from backend.app.main import app
 
         self.server = uvicorn.Server(
-            uvicorn.Config(app, host="127.0.0.1", port=self.port, log_level="warning", access_log=False)
+            uvicorn.Config(
+                app,
+                host="127.0.0.1",
+                port=self.port,
+                log_level="warning",
+                access_log=False,
+                log_config=uvicorn_log_config(),
+            )
         )
         self.thread = threading.Thread(target=self.server.run, name="xiaobai-api", daemon=True)
         self.thread.start()

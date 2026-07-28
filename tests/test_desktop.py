@@ -1,3 +1,4 @@
+import logging.config
 from pathlib import Path
 
 from backend.app.services.export_service import _cleanup_export_artifacts
@@ -14,6 +15,27 @@ def test_desktop_runtime_uses_writable_user_paths(tmp_path, monkeypatch):
     assert Path(runtime_env["UPLOAD_DIR"]) == tmp_path / "uploads"
     assert Path(runtime_env["EXPORTS_DIR"]) == tmp_path / "exports"
     assert runtime_env["DELETE_SOURCE_AFTER_EXPORT"] == "true"
+
+
+def test_ensure_stdio_handles_missing_console_streams(tmp_path, monkeypatch):
+    """Windowed PyInstaller builds leave stdout/stderr as None on Windows."""
+    monkeypatch.setattr(desktop_main.sys, "stdout", None)
+    monkeypatch.setattr(desktop_main.sys, "stderr", None)
+
+    log_path = desktop_main.ensure_stdio(tmp_path)
+
+    assert log_path == tmp_path / "desktop.log"
+    assert desktop_main.sys.stdout is not None
+    assert desktop_main.sys.stderr is not None
+    assert hasattr(desktop_main.sys.stdout, "isatty")
+    assert desktop_main.sys.stdout.isatty() is False
+
+
+def test_uvicorn_log_config_loads_without_color_formatter():
+    """Frozen GUI apps must not use uvicorn ColorFormatter (needs TTY)."""
+    config = desktop_main.uvicorn_log_config()
+    logging.config.dictConfig(config)
+    assert config["formatters"]["default"]["()"] == "logging.Formatter"
 
 
 def test_desktop_export_cleanup_removes_source_copy(tmp_path, monkeypatch):

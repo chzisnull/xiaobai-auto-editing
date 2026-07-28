@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 
 from backend.app.detectors.audio_visual import AudioVisualRallyDetector
+from backend.app.detectors.highlight_filter import StrictHighlightFilter
 from backend.app.detectors.rally_scorer import MultimodalRallyScorer
 from backend.app.detectors.tracknet_v3 import TrackNetV3BoundaryRefiner
 from backend.app.detectors.trajectory_series import TrajectorySeries
@@ -12,6 +13,7 @@ from backend.app.detectors.trajectory_series import TrajectorySeries
 
 NormalizedPoint = Tuple[float, float]
 logger = logging.getLogger(__name__)
+_UNSET = object()
 
 
 class CourtAwareRallyDetector(AudioVisualRallyDetector):
@@ -27,22 +29,37 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
     def __init__(
         self,
         court_roi: Optional[Sequence[Sequence[float]]] = None,
-        landing_delay: float = 1.2,
-        serve_lead: float = 0.45,
-        max_serve_lookback: float = 2.8,
-        max_bridge_gap: float = 4.2,
-        residual_motion_window: float = 2.0,
-        max_rally_duration: float = 28.0,
+        landing_delay: float = 1.0,
+        serve_lead: float = 0.35,
+        max_serve_lookback: float = 2.0,
+        max_bridge_gap: float = 3.2,
+        residual_motion_window: float = 1.4,
+        max_rally_duration: float = 20.0,
+        highlight_mode: Optional[str] = None,
         trajectory_refiner: Optional[TrackNetV3BoundaryRefiner] = None,
         rally_scorer: Optional[MultimodalRallyScorer] = None,
+        highlight_filter: Any = _UNSET,
         **kwargs: Any,
     ) -> None:
+        # strict (default): highlight-only clips. standard: more recall, more padding.
+        mode = (highlight_mode or os.getenv("RALLY_MODE", "strict")).strip().lower()
+        self.highlight_mode = mode if mode in {"strict", "standard"} else "strict"
+        self.strict = self.highlight_mode == "strict"
+
         kwargs.setdefault("visual_fps", 8)
         kwargs.setdefault("motion_threshold", 0.01)
-        # Prefer clean rally cuts over gluing dead-ball walking. Soft mid-rally
-        # holes can still bridge, but not multi-second between-point gaps.
-        kwargs.setdefault("max_silence_gap", 3.0)
-        kwargs.setdefault("min_rally_duration", 1.2)
+        if self.strict:
+            kwargs.setdefault("max_silence_gap", 2.2)
+            kwargs.setdefault("min_rally_duration", 1.4)
+            landing_delay = min(landing_delay, 1.0)
+            serve_lead = min(serve_lead, 0.4)
+            max_serve_lookback = min(max_serve_lookback, 2.0)
+            max_bridge_gap = min(max_bridge_gap, 3.2)
+            residual_motion_window = min(residual_motion_window, 1.4)
+            max_rally_duration = min(max_rally_duration, 20.0)
+        else:
+            kwargs.setdefault("max_silence_gap", 3.0)
+            kwargs.setdefault("min_rally_duration", 1.2)
         super().__init__(**kwargs)
         self.court_roi = self._normalize_court_roi(court_roi)
         self.landing_delay = max(0.2, min(float(landing_delay), 2.0))
@@ -60,10 +77,36 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
         scorer_enabled = os.getenv("MULTIMODAL_SCORER", "true").lower() in ("1", "true", "yes")
         self.rally_scorer = rally_scorer if rally_scorer is not None else (
             MultimodalRallyScorer(
-                merge_gap=min(self.max_bridge_gap, 4.0),
+                merge_gap=min(self.max_bridge_gap, 3.5 if self.strict else 4.0),
+                serve_lookback=1.2 if self.strict else 2.2,
+                land_lookahead=1.2 if self.strict else 1.8,
                 max_rally_duration=self.max_rally_duration,
+                min_hit_density=0.32 if self.strict else 0.18,
             ) if scorer_enabled else None
         )
+        if highlight_filter is not _UNSET:
+            # Explicit None disables the filter (used by unit tests).
+            self.highlight_filter = highlight_filter
+        elif self.strict:
+            self.highlight_filter = StrictHighlightFilter(
+                serve_pad=0.85,
+                land_pad=1.0,
+                max_hit_silence=2.2,
+                min_hits=3,
+                min_duration=1.4,
+                max_duration=self.max_rally_duration,
+                min_hit_density=0.32,
+            )
+        else:
+            self.highlight_filter = StrictHighlightFilter(
+                serve_pad=1.2,
+                land_pad=1.4,
+                max_hit_silence=2.8,
+                min_hits=2,
+                min_duration=1.2,
+                max_duration=max(self.max_rally_duration, 28.0),
+                min_hit_density=0.18,
+            )
 
     @classmethod
     def _normalize_court_roi(
@@ -212,9 +255,11 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             mean_energy, active_fraction = interval_motion_stats(previous_hit, next_hit)
             # Dense continuous motion can bridge a short hole (missed soft hit).
             # Cap the pure-motion bridge so between-point walking is not glued.
+            pure_motion_cap = 3.2 if self.strict else 4.5
+            pure_motion_frac = 0.62 if self.strict else 0.55
             if (
-                gap <= min(self.max_bridge_gap, 4.5)
-                and active_fraction >= 0.55
+                gap <= min(self.max_bridge_gap, pure_motion_cap)
+                and active_fraction >= pure_motion_frac
                 and mean_energy >= merge_motion_threshold
             ):
                 return True
@@ -225,7 +270,7 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
                     previous_hit + 0.05 < soft_time < next_hit - 0.05
                     and soft_motion >= bridge_threshold
                     and gap <= self.max_bridge_gap
-                    and active_fraction >= 0.30
+                    and active_fraction >= (0.38 if self.strict else 0.30)
                 ):
                     return True
             return False
@@ -348,16 +393,26 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
                         break
 
             hit_count = max(1, len(group))
-            start = walk_motion_start(first_hit, self.max_serve_lookback)
-            end = walk_motion_end(last_hit, self.residual_motion_window)
+            # Strict highlight mode: keep clips tight around audible hits.
+            if self.strict:
+                start = max(0.0, first_hit - self.serve_lead - 0.5)
+                end = last_hit + self.landing_delay
+            else:
+                start = walk_motion_start(first_hit, self.max_serve_lookback)
+                end = walk_motion_end(last_hit, self.residual_motion_window)
             duration = end - start
             mean_support = float(np.mean([motion for _, motion in group]))
             normalized_support = max(0.0, min(1.0, (mean_support - support_threshold) / motion_span))
 
             # One-hit service faults are retained only when court motion is unusually strong.
-            if hit_count == 1 and normalized_support < 0.75:
-                continue
+            min_hits = 3 if self.strict else 1
+            if hit_count < min_hits:
+                if not (hit_count == 1 and normalized_support >= 0.85 and not self.strict):
+                    continue
             if duration < self.min_rally_duration:
+                continue
+            hit_span = max(0.25, last_hit - first_hit)
+            if self.strict and hit_count / hit_span < 0.28 and hit_count < 5:
                 continue
 
             count_score = min(1.0, hit_count / 6.0)
@@ -370,19 +425,25 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
                 "last_hit": last_hit,
             })
 
-        rallies = self._expand_rallies_with_motion(
-            rallies,
-            motion_timestamps,
-            motion_energies,
-            residual_threshold,
-            onset_threshold,
-        )
-        return self._merge_motion_linked_rallies(
+        if not self.strict:
+            rallies = self._expand_rallies_with_motion(
+                rallies,
+                motion_timestamps,
+                motion_energies,
+                residual_threshold,
+                onset_threshold,
+            )
+        rallies = self._merge_motion_linked_rallies(
             rallies,
             motion_timestamps,
             motion_energies,
             merge_motion_threshold,
         )
+        # Always run highlight filter when we still have hit peaks available.
+        hit_peaks_arr = np.asarray(hit_peaks, dtype=float)
+        if self.highlight_filter is not None and len(hit_peaks_arr):
+            rallies = self.highlight_filter.apply(rallies, hit_peaks_arr)
+        return rallies
 
     def _expand_rallies_with_motion(
         self,
@@ -472,9 +533,11 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             )
 
             should_merge = False
-            if gap <= 0.8 or hit_gap <= min(2.4, self.max_silence_gap):
+            tight_gap = 0.55 if self.strict else 0.8
+            tight_hit_gap = 1.8 if self.strict else min(2.4, self.max_silence_gap)
+            if gap <= tight_gap or hit_gap <= tight_hit_gap:
                 should_merge = True
-            elif hit_gap <= self.max_bridge_gap:
+            elif hit_gap <= self.max_bridge_gap and not self.strict:
                 span_start = float(previous.get("last_hit", previous["end"]))
                 span_end = float(candidate.get("first_hit", candidate["start"]))
                 left = np.searchsorted(motion_timestamps, span_start, side="left")
@@ -490,7 +553,7 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
                 projected = max(float(previous["end"]), float(candidate["end"])) - min(
                     float(previous["start"]), float(candidate["start"])
                 )
-                if projected > self.max_rally_duration and hit_gap > 2.0:
+                if projected > self.max_rally_duration and hit_gap > (1.6 if self.strict else 2.0):
                     should_merge = False
 
             if should_merge:
@@ -540,7 +603,7 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
 
     def _rally_merge_gap_threshold(self) -> float:
         # Keep post-format merge tight so dead-ball gaps are not re-glued.
-        return 0.9
+        return 0.45 if self.strict else 0.9
 
     def _detect_audio_hits(self, audio: np.ndarray, sr: int) -> np.ndarray:
         hits = super()._detect_audio_hits(audio, sr)
@@ -607,15 +670,23 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
                         motion_energies=motion_energies,
                         trajectory=series,
                     )
+                    if self.highlight_filter is not None:
+                        refined = self.highlight_filter.apply(refined, hit_peaks)
                     return self._clamp_adjacent_overlaps(refined)
                 logger.info("TrackNet produced no points; falling back to boundary refine")
             except Exception as exc:
                 logger.warning("Multimodal trajectory scoring skipped: %s", exc)
 
+        # Even without trajectory points, re-apply strict highlight filter.
+        if self.highlight_filter is not None and len(np.asarray(hit_peaks)):
+            raw_rallies = self.highlight_filter.apply(raw_rallies, np.asarray(hit_peaks, dtype=float))
+
         if self.trajectory_refiner is None:
             return raw_rallies
         try:
             refined = self.trajectory_refiner.refine(video_path, raw_rallies, self.court_roi)
+            if self.highlight_filter is not None and len(np.asarray(hit_peaks)):
+                refined = self.highlight_filter.apply(refined, np.asarray(hit_peaks, dtype=float))
             return self._clamp_adjacent_overlaps(
                 refined,
                 min_gap=0.45,
