@@ -8,27 +8,78 @@ permissions:
   actions: read
 
 jobs:
-  attach-macos:
+  republish:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
-      - name: Download macOS artifact from release CI run
+      - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
-          name: macos-installer
-          path: assets
+          name: windows-installer
+          path: assets/windows
           github-token: ${{ secrets.GITHUB_TOKEN }}
           run-id: 30343089867
 
-      - name: List
-        run: ls -lh assets/
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-installer
+          path: assets/macos
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: 30343089867
 
-      - name: Upload DMG to release v1.2.0
+      - name: Download existing Android APK from current release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          FILE=$(ls assets/*.dmg | head -1)
-          echo "Uploading $FILE"
-          gh release upload v1.2.0 "$FILE" --repo "${{ github.repository }}" --clobber
-          gh release view v1.2.0 --repo "${{ github.repository }}" --json assets --jq '.assets[] | {name, size}'
+          mkdir -p assets/android
+          gh release download v1.2.0 \
+            --repo "${{ github.repository }}" \
+            --pattern '*android*.apk' \
+            --dir assets/android
+
+      - name: List assets
+        run: find assets -type f -exec ls -lh {} \;
+
+      - name: Recreate release with all three installers
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Delete existing release (keep tag)
+          gh release delete v1.2.0 --repo "${{ github.repository }}" --yes || true
+          # Wait for GitHub consistency
+          sleep 3
+
+          WIN=$(ls assets/windows/*.exe | head -1)
+          MAC=$(ls assets/macos/*.dmg | head -1)
+          APK=$(ls assets/android/*.apk | head -1)
+          echo "WIN=$WIN"
+          echo "MAC=$MAC"
+          echo "APK=$APK"
+
+          # Create as draft first, upload, then publish
+          gh release create v1.2.0 \
+            --repo "${{ github.repository }}" \
+            --title "小白自动剪辑 v1.2.0" \
+            --draft \
+            --notes "$(cat <<'EOF'
+          ## 全平台安装包
+
+          本版本同时提供 **Windows / macOS / Android** 安装包。
+
+          ### Windows
+          - `XiaobaiAutoEditing-1.2.0-Windows-Setup.exe`
+
+          ### macOS（Apple Silicon）
+          - `XiaobaiAutoEditing-1.2.0-macOS-arm64.dmg`
+
+          ### Android
+          - `XiaobaiAutoEditing-1.2.0-android-debug.apk`
+          EOF
+          )" \
+            "$WIN" "$MAC" "$APK"
+
+          gh release edit v1.2.0 --repo "${{ github.repository }}" --draft=false
+          gh release view v1.2.0 --repo "${{ github.repository }}" --json url,assets --jq '{url, assets: [.assets[] | {name, size}]}'
