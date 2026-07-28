@@ -1,0 +1,15 @@
+#!/bin/sh
+# Thin launcher for environments without a full wrapper bootstrap.
+# Prefer opening this project in Android Studio, which manages the wrapper.
+set -e
+DIR="$(cd "$(dirname "$0")" && pwd)"
+export JAVA_HOME="${JAVA_HOME:-/opt/homebrew/opt/openjdk@17}"
+export PATH="$JAVA_HOME/bin:$PATH"
+if [ -x /tmp/gradle-8.7/bin/gradle ]; then
+  exec /tmp/gradle-8.7/bin/gradle -p "$DIR" "$@"
+fi
+if command -v gradle >/dev/null 2>&1; then
+  exec gradle -p "$DIR" "$@"
+fi
+echo "Gradle not found. Open android/ in Android Studio to sync and build." >&2
+exit 1

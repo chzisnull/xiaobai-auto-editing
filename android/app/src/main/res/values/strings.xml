@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">小白自动剪辑</string>
+    <string name="app_subtitle">羽毛球回合智能剪辑 · 端侧</string>
+    <string name="pick_video">选择录像</string>
+    <string name="start_analyze">开始识别</string>
+    <string name="export_video">导出成片</string>
+    <string name="analyzing">正在端侧分析回合…</string>
+    <string name="no_rallies">暂无回合，请先选择视频并开始识别</string>
+</resources>
