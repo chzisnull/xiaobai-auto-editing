@@ -49,14 +49,16 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
         kwargs.setdefault("visual_fps", 8)
         kwargs.setdefault("motion_threshold", 0.01)
         if self.strict:
-            kwargs.setdefault("max_silence_gap", 2.2)
-            kwargs.setdefault("min_rally_duration", 1.4)
-            landing_delay = min(landing_delay, 1.0)
-            serve_lead = min(serve_lead, 0.4)
-            max_serve_lookback = min(max_serve_lookback, 2.0)
-            max_bridge_gap = min(max_bridge_gap, 3.2)
-            residual_motion_window = min(residual_motion_window, 1.4)
-            max_rally_duration = min(max_rally_duration, 20.0)
+            # Slightly longer silence than before so soft mid-rally exchanges
+            # are not chopped; dead-ball is still cut by motion-aware filter.
+            kwargs.setdefault("max_silence_gap", 2.6)
+            kwargs.setdefault("min_rally_duration", 1.5)
+            landing_delay = min(landing_delay, 0.95)
+            serve_lead = min(serve_lead, 0.35)
+            max_serve_lookback = min(max_serve_lookback, 1.8)
+            max_bridge_gap = min(max_bridge_gap, 3.8)
+            residual_motion_window = min(residual_motion_window, 1.2)
+            max_rally_duration = min(max_rally_duration, 22.0)
         else:
             kwargs.setdefault("max_silence_gap", 3.0)
             kwargs.setdefault("min_rally_duration", 1.2)
@@ -89,23 +91,27 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             self.highlight_filter = highlight_filter
         elif self.strict:
             self.highlight_filter = StrictHighlightFilter(
-                serve_pad=0.85,
-                land_pad=1.0,
-                max_hit_silence=2.2,
+                serve_pad=0.75,
+                land_pad=0.95,
+                max_hit_silence=2.5,
+                motion_bridge_silence=3.6,
                 min_hits=3,
-                min_duration=1.4,
+                min_duration=1.5,
                 max_duration=self.max_rally_duration,
-                min_hit_density=0.32,
+                min_hit_density=0.30,
+                remerge_gap=1.35,
             )
         else:
             self.highlight_filter = StrictHighlightFilter(
-                serve_pad=1.2,
-                land_pad=1.4,
+                serve_pad=1.1,
+                land_pad=1.3,
                 max_hit_silence=2.8,
+                motion_bridge_silence=4.2,
                 min_hits=2,
                 min_duration=1.2,
                 max_duration=max(self.max_rally_duration, 28.0),
                 min_hit_density=0.18,
+                remerge_gap=1.6,
             )
 
     @classmethod
@@ -255,8 +261,8 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             mean_energy, active_fraction = interval_motion_stats(previous_hit, next_hit)
             # Dense continuous motion can bridge a short hole (missed soft hit).
             # Cap the pure-motion bridge so between-point walking is not glued.
-            pure_motion_cap = 3.2 if self.strict else 4.5
-            pure_motion_frac = 0.62 if self.strict else 0.55
+            pure_motion_cap = 3.6 if self.strict else 4.5
+            pure_motion_frac = 0.48 if self.strict else 0.55
             if (
                 gap <= min(self.max_bridge_gap, pure_motion_cap)
                 and active_fraction >= pure_motion_frac
@@ -270,7 +276,7 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
                     previous_hit + 0.05 < soft_time < next_hit - 0.05
                     and soft_motion >= bridge_threshold
                     and gap <= self.max_bridge_gap
-                    and active_fraction >= (0.38 if self.strict else 0.30)
+                    and active_fraction >= (0.32 if self.strict else 0.30)
                 ):
                     return True
             return False
@@ -442,7 +448,12 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
         # Always run highlight filter when we still have hit peaks available.
         hit_peaks_arr = np.asarray(hit_peaks, dtype=float)
         if self.highlight_filter is not None and len(hit_peaks_arr):
-            rallies = self.highlight_filter.apply(rallies, hit_peaks_arr)
+            rallies = self.highlight_filter.apply(
+                rallies,
+                hit_peaks_arr,
+                motion_timestamps=motion_timestamps,
+                motion_energies=motion_energies,
+            )
         return rallies
 
     def _expand_rallies_with_motion(
@@ -671,7 +682,12 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
                         trajectory=series,
                     )
                     if self.highlight_filter is not None:
-                        refined = self.highlight_filter.apply(refined, hit_peaks)
+                        refined = self.highlight_filter.apply(
+                            refined,
+                            hit_peaks,
+                            motion_timestamps=motion_timestamps,
+                            motion_energies=motion_energies,
+                        )
                     return self._clamp_adjacent_overlaps(refined)
                 logger.info("TrackNet produced no points; falling back to boundary refine")
             except Exception as exc:
@@ -679,14 +695,24 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
 
         # Even without trajectory points, re-apply strict highlight filter.
         if self.highlight_filter is not None and len(np.asarray(hit_peaks)):
-            raw_rallies = self.highlight_filter.apply(raw_rallies, np.asarray(hit_peaks, dtype=float))
+            raw_rallies = self.highlight_filter.apply(
+                raw_rallies,
+                np.asarray(hit_peaks, dtype=float),
+                motion_timestamps=motion_timestamps,
+                motion_energies=motion_energies,
+            )
 
         if self.trajectory_refiner is None:
             return raw_rallies
         try:
             refined = self.trajectory_refiner.refine(video_path, raw_rallies, self.court_roi)
             if self.highlight_filter is not None and len(np.asarray(hit_peaks)):
-                refined = self.highlight_filter.apply(refined, np.asarray(hit_peaks, dtype=float))
+                refined = self.highlight_filter.apply(
+                    refined,
+                    np.asarray(hit_peaks, dtype=float),
+                    motion_timestamps=motion_timestamps,
+                    motion_energies=motion_energies,
+                )
             return self._clamp_adjacent_overlaps(
                 refined,
                 min_gap=0.45,

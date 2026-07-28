@@ -418,6 +418,33 @@ def test_strict_highlight_filter_splits_and_drops_dead_ball():
     assert noise == []
 
 
+def test_strict_highlight_filter_keeps_mid_rally_when_motion_live():
+    """Hit silence alone must not cut if court motion stays elevated."""
+    filt = StrictHighlightFilter(max_hit_silence=2.2, motion_bridge_silence=3.8, min_hits=3)
+    rallies = [{"start": 1.0, "end": 10.0, "first_hit": 1.2, "last_hit": 9.0, "confidence": 0.8}]
+    # 3.0s hole between hits 3.0 and 6.0, but motion remains active.
+    hits = np.array([1.2, 1.9, 2.6, 3.0, 6.0, 6.7, 7.4, 8.2, 9.0])
+    motion_t = np.arange(0.0, 12.0, 0.1)
+    motion_e = np.full_like(motion_t, 0.002, dtype=float)
+    motion_e[(motion_t >= 1.0) & (motion_t <= 9.5)] = 0.04
+
+    out = filt.apply(rallies, hits, motion_t, motion_e)
+    assert len(out) == 1
+    assert out[0]["first_hit"] <= 1.3
+    assert out[0]["last_hit"] >= 8.8
+
+
+def test_strict_highlight_filter_drops_idle_waiting_clip():
+    filt = StrictHighlightFilter(min_hits=3, min_duration=1.5)
+    rallies = [{"start": 10.0, "end": 14.0, "first_hit": 10.5, "last_hit": 13.0, "confidence": 0.55}]
+    hits = np.array([10.5, 11.8, 13.0])
+    motion_t = np.arange(0.0, 20.0, 0.1)
+    motion_e = np.full_like(motion_t, 0.002, dtype=float)  # mostly idle
+
+    out = filt.apply(rallies, hits, motion_t, motion_e)
+    assert out == []
+
+
 def test_court_aware_detector_normalizes_custom_roi():
     roi = [[0.2, 0.3], [0.8, 0.3], [0.95, 0.95], [0.05, 0.95]]
     detector = CourtAwareRallyDetector(court_roi=roi)
