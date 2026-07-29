@@ -2,8 +2,10 @@ package icu.yuqiuyijiaren.xiaobai.analysis
 
 import android.content.Context
 import android.net.Uri
+import icu.yuqiuyijiaren.xiaobai.domain.AnalysisConfig
 import icu.yuqiuyijiaren.xiaobai.domain.AnalysisPhase
 import icu.yuqiuyijiaren.xiaobai.domain.AnalysisProgress
+import icu.yuqiuyijiaren.xiaobai.domain.CourtRoi
 import icu.yuqiuyijiaren.xiaobai.domain.Rally
 import icu.yuqiuyijiaren.xiaobai.domain.VideoSource
 import kotlinx.coroutines.flow.Flow
@@ -11,19 +13,28 @@ import kotlinx.coroutines.flow.Flow
 /**
  * On-device rally analyzer contract.
  *
- * Current implementation: [HeuristicOnDeviceAnalyzer] (audio energy + silence grouping).
- * Next steps: ONNX TrackNet / court-ROI motion / MediaCodec decode pipeline.
+ * Default: [OnDevicePcAnalyzer] (audio hits + court ROI motion + strict highlight).
+ * Fallback: [HeuristicOnDeviceAnalyzer]. Future: ONNX TrackNet precise tier.
  */
+data class AnalysisRequest(
+    val source: VideoSource,
+    val courtRoi: CourtRoi = CourtRoi.DEFAULT,
+    val config: AnalysisConfig? = null,
+)
+
 interface RallyAnalyzer {
     fun analyze(
         context: Context,
-        source: VideoSource,
+        request: AnalysisRequest,
     ): Flow<AnalysisUpdate>
 }
 
 sealed interface AnalysisUpdate {
     data class Progress(val progress: AnalysisProgress) : AnalysisUpdate
-    data class Result(val rallies: List<Rally>) : AnalysisUpdate
+    data class Result(
+        val rallies: List<Rally>,
+        val warnings: List<String> = emptyList(),
+    ) : AnalysisUpdate
     data class Error(val message: String) : AnalysisUpdate
 }
 

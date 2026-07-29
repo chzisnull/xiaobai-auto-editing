@@ -1,0 +1,77 @@
+name: Release Android only
+
+# Tags like v0.4.1-android publish only the Android APK (no desktop builds).
+on:
+  push:
+    tags:
+      - "v*-android"
+      - "v*-android.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-publish:
+    name: Build Android APK & Publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Resolve version
+        shell: bash
+        run: |
+          # v0.4.1-android -> 0.4.1-android
+          version="${GITHUB_REF_NAME#v}"
+          echo "XIAOBAI_VERSION=$version" >> "$GITHUB_ENV"
+          echo "Release version: $version"
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          set -euo pipefail
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon
+          mkdir -p ../release
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            "../release/XiaobaiAutoEditing-${XIAOBAI_VERSION}-android-debug.apk"
+          ls -lh ../release/
+
+      - name: Create GitHub Release (Android only)
+        uses: softprops/action-gh-release@v2
+        with:
+          name: 小白自动剪辑 Android ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            ## Android 端侧版（单独发布）
+
+            本 Release **仅包含 Android APK**，不含 Windows / macOS 桌面安装包。
+
+            ### 安装
+            1. 手机开启「允许安装未知来源应用」
+            2. 下载 `XiaobaiAutoEditing-*-android-debug.apk` 并安装
+            3. 授予相册 / 视频读取权限
+
+            ### 功能概要
+            - 端侧识别：音频击球 + 球场 ROI 运动 + 严格高光（标准档）
+            - 识别强度：快速 / 标准 / 精确（按设备性能推荐）
+            - 精剪审核：固定视频预览、时间轴修剪、播放本段、入出点
+            - 本地导出 + 系统分享（不上传服务器）
+
+            ### 说明
+            - 包名：`icu.yuqiuyijiaren.xiaobai.debug`
+            - Debug 内测签名，便于快速分发
+            - 分析与导出均在设备本地完成
+          files: |
+            release/XiaobaiAutoEditing-*-android-debug.apk

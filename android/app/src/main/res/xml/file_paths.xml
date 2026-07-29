@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <cache-path name="cache" path="." />
-    <files-path name="files" path="." />
-    <external-cache-path name="external_cache" path="." />
+    <!-- Only expose export remux outputs for share intents -->
+    <cache-path name="exports" path="exports/" />
 </paths>

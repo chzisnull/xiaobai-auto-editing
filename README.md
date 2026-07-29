@@ -8,7 +8,7 @@
 - `backend/` - Python（FastAPI + 音视频分析 + FFmpeg）回合识别与剪辑处理后端
 - `frontend/` - 响应式 H5 前端界面 (支持视频上传、AI识别切片时间轴可视微调、压缩导出)
 - `desktop/` - macOS / Windows 桌面壳
-- `android/` - **Android 端侧 App**（本地分析 + 本地导出，见 [`android/README.md`](android/README.md)）
+- `android/` - **Android 端侧 App**（本地分析 + 本地导出；本机 Mac 模拟器调试见 [`android/README.md`](android/README.md) 与 `android/scripts/`）
 
 ## 快速开发与试运行
 

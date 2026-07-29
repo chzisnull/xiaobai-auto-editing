@@ -13,8 +13,11 @@ data class Rally(
     val durationSec: Double get() = (endSec - startSec).coerceAtLeast(0.0)
 
     fun clamp(duration: Double): Rally {
-        val start = startSec.coerceIn(0.0, duration)
-        val end = endSec.coerceIn(start + 0.2, duration)
+        if (duration <= 0.0) return copy(startSec = 0.0, endSec = 0.0)
+        val minLen = minOf(0.2, duration)
+        val maxStart = (duration - minLen).coerceAtLeast(0.0)
+        val start = startSec.coerceIn(0.0, maxStart)
+        val end = endSec.coerceIn(start + minLen, duration)
         return copy(startSec = start, endSec = end)
     }
 }
@@ -25,6 +28,33 @@ data class VideoSource(
     val durationMs: Long,
 ) {
     val durationSec: Double get() = durationMs / 1000.0
+}
+
+/**
+ * Four normalized corner points of the court ROI (x,y in 0..1),
+ * order: TL, TR, BR, BL — same convention as desktop H5.
+ */
+data class CourtRoi(
+    val points: List<Pair<Float, Float>>,
+) {
+    init {
+        require(points.size == 4) { "Court ROI needs exactly 4 points" }
+    }
+
+    fun asPairs(): List<Pair<Float, Float>> = points.map { (x, y) ->
+        x.coerceIn(0f, 1f) to y.coerceIn(0f, 1f)
+    }
+
+    companion object {
+        val DEFAULT = CourtRoi(
+            listOf(
+                0.20f to 0.34f,
+                0.82f to 0.34f,
+                0.98f to 0.96f,
+                0.02f to 0.96f,
+            ),
+        )
+    }
 }
 
 enum class AnalysisPhase {
@@ -43,17 +73,49 @@ data class AnalysisProgress(
     val message: String = "",
 )
 
+// AnalysisTier + AnalysisConfig live in AnalysisConfig.kt
+
+/** One-shot playback instruction for the video player. */
+data class PlaybackCommand(
+    val token: Long,
+    val seekSec: Double,
+    val playUntilSec: Double? = null,
+    val autoPlay: Boolean = false,
+)
+
 sealed interface EditorEvent {
     data object PickVideo : EditorEvent
     data class VideoPicked(val source: VideoSource) : EditorEvent
     data object StartAnalysis : EditorEvent
+    data object CancelAnalysis : EditorEvent
     data class SelectRally(val index: Int?) : EditorEvent
     data class UpdateRally(val index: Int, val startSec: Double, val endSec: Double) : EditorEvent
     data class DeleteRally(val index: Int) : EditorEvent
     data class AddRallyAt(val timeSec: Double) : EditorEvent
     data class SeekTo(val timeSec: Double) : EditorEvent
+    data object MergeSelectedWithNext : EditorEvent
+    data object SplitSelectedAtPlayhead : EditorEvent
+    data class NudgeSelected(val deltaSec: Double) : EditorEvent
+    /** Nudge only start or only end of selected rally. */
+    data class NudgeSelectedEdge(val startDelta: Double = 0.0, val endDelta: Double = 0.0) : EditorEvent
+    data object SetSelectedStartAtPlayhead : EditorEvent
+    data object SetSelectedEndAtPlayhead : EditorEvent
+    data object MarkRangeStartAtPlayhead : EditorEvent
+    data object MarkRangeEndAtPlayhead : EditorEvent
+    data object ClearRangeMarks : EditorEvent
+    data object PlaySelected : EditorEvent
+    data object SelectPrevious : EditorEvent
+    data object SelectNext : EditorEvent
+    data object Undo : EditorEvent
+    data object ShowRoiEditor : EditorEvent
+    data object HideRoiEditor : EditorEvent
+    data class UpdateCourtRoiPoint(val index: Int, val x: Float, val y: Float) : EditorEvent
+    data object ResetCourtRoi : EditorEvent
+    data class SetAnalysisTier(val tier: AnalysisTier) : EditorEvent
     data object Export : EditorEvent
     data object ClearError : EditorEvent
+    data object ClearExportPath : EditorEvent
+    data object ClearPlaybackCommand : EditorEvent
 }
 
 data class EditorUiState(
@@ -64,7 +126,22 @@ data class EditorUiState(
     val analysis: AnalysisProgress = AnalysisProgress(),
     val isExporting: Boolean = false,
     val exportPath: String? = null,
+    val shareRequested: Boolean = false,
     val errorMessage: String? = null,
+    val courtRoi: CourtRoi = CourtRoi.DEFAULT,
+    val showRoiEditor: Boolean = false,
+    val analysisWarnings: List<String> = emptyList(),
+    /** Mark-in for creating a new range (null when unset). */
+    val rangeMarkInSec: Double? = null,
+    /** Mark-out for creating a new range. */
+    val rangeMarkOutSec: Double? = null,
+    val canUndo: Boolean = false,
+    val playback: PlaybackCommand? = null,
+    val deviceSummary: String = "",
+    val deviceCapabilityLine: String = "",
+    val analysisTier: AnalysisTier = AnalysisTier.Standard,
+    val analysisConfigSummary: String = "",
+    val recommendedTier: AnalysisTier = AnalysisTier.Standard,
 ) {
     val isAnalyzing: Boolean
         get() = analysis.phase != AnalysisPhase.Idle &&
@@ -73,6 +150,9 @@ data class EditorUiState(
 
     val selectedDurationSec: Double
         get() = rallies.sumOf { it.durationSec }
+
+    val selectedRally: Rally?
+        get() = selectedRallyIndex?.let { rallies.getOrNull(it) }
 
     val reductionPercent: Int
         get() {

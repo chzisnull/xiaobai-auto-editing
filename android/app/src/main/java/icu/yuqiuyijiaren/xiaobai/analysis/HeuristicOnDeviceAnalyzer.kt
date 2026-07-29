@@ -42,8 +42,9 @@ class HeuristicOnDeviceAnalyzer(
     private val minHitDensity: Double = 0.28,
 ) : RallyAnalyzer {
 
-    override fun analyze(context: Context, source: VideoSource): Flow<AnalysisUpdate> = flow {
+    override fun analyze(context: Context, request: AnalysisRequest): Flow<AnalysisUpdate> = flow {
         try {
+            val source = request.source
             emit(progress(AnalysisPhase.Preparing, 0.05f))
             val uri = Uri.parse(source.uriString)
             emit(progress(AnalysisPhase.ExtractingAudio, 0.15f))

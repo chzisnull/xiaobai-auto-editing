@@ -1,0 +1,83 @@
+package icu.yuqiuyijiaren.xiaobai.analysis
+
+import icu.yuqiuyijiaren.xiaobai.analysis.pipeline.CourtAwareRallyBuilder
+import icu.yuqiuyijiaren.xiaobai.analysis.pipeline.MotionSeries
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class CourtAwareRallyBuilderTest {
+
+    private val builder = CourtAwareRallyBuilder(strict = true, visualFps = 8)
+
+    @Test
+    fun buildsDenseRallyFromSupportedHitsAndMotion() {
+        val hits = doubleArrayOf(10.0, 10.7, 11.4, 12.1, 12.9, 13.6)
+        val motion = flatMotion(from = 9.0, to = 15.0, energy = 0.08, duration = 40.0)
+        val rallies = builder.build(hits, motion)
+        assertEquals(1, rallies.size)
+        assertTrue(rallies[0].start < 10.0)
+        assertTrue(rallies[0].end > 13.6)
+        assertTrue(rallies[0].confidence > 0.5)
+    }
+
+    @Test
+    fun dropsSparseTwoHitStubInStrictMode() {
+        val hits = doubleArrayOf(5.0, 5.5)
+        val motion = flatMotion(from = 4.0, to = 7.0, energy = 0.08, duration = 20.0)
+        val rallies = builder.build(hits, motion)
+        assertTrue(rallies.isEmpty())
+    }
+
+    @Test
+    fun audioOnlyGroupsBySilenceGap() {
+        val hits = doubleArrayOf(
+            1.0, 1.6, 2.2, 2.8,
+            20.0, 20.6, 21.2, 21.8,
+        )
+        val rallies = builder.build(hits, motion = null)
+        assertEquals(2, rallies.size)
+        assertTrue(rallies[0].lastHit < 5.0)
+        assertTrue(rallies[1].firstHit > 15.0)
+    }
+
+    @Test
+    fun emptyHitsYieldEmpty() {
+        assertTrue(builder.build(doubleArrayOf(), null).isEmpty())
+    }
+
+    @Test
+    fun walkMotionStartPullsServeLeadBeforeFirstHit() {
+        // Elevated motion begins ~1.2s before first supported hit
+        val hits = doubleArrayOf(10.0, 10.7, 11.4, 12.1, 12.8)
+        val motionT = DoubleArray(80) { it * 0.2 }
+        val motionE = DoubleArray(80) { idx ->
+            val t = motionT[idx]
+            when {
+                t in 8.5..13.5 -> 0.09
+                else -> 0.002
+            }
+        }
+        val rallies = builder.build(hits, MotionSeries(motionT, motionE))
+        assertTrue(rallies.isNotEmpty())
+        // Should start before first hit (serve walk-back), not only firstHit - 0.85
+        assertTrue(rallies[0].start < 9.5)
+        assertTrue(rallies[0].end > 12.8)
+    }
+
+    private fun flatMotion(
+        from: Double,
+        to: Double,
+        energy: Double,
+        duration: Double,
+        step: Double = 0.2,
+    ): MotionSeries {
+        val n = ((duration / step).toInt() + 1)
+        val t = DoubleArray(n) { it * step }
+        val e = DoubleArray(n) { idx ->
+            val time = t[idx]
+            if (time in from..to) energy else 0.002
+        }
+        return MotionSeries(t, e)
+    }
+}
