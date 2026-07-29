@@ -1,10 +1,14 @@
 package icu.yuqiuyijiaren.xiaobai.domain
 
 import icu.yuqiuyijiaren.xiaobai.device.DeviceProfile
+import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Recognition intensity tiers. User may override; defaults come from [DeviceProfile].
- * Higher tiers trade CPU/RAM for better motion fidelity and boundary quality.
+ *
+ * Speed design: high-end RAM must NOT auto-inflate motion FPS. Long videos are capped
+ * by total sample budget; motion uses sequential MediaCodec, not random seeks.
  */
 enum class AnalysisTier(
     val label: String,
@@ -12,7 +16,7 @@ enum class AnalysisTier(
 ) {
     Fast(
         label = "快速",
-        hint = "省电 · 适合低端机/预览",
+        hint = "省电 · 长片优先",
     ),
     Standard(
         label = "标准",
@@ -20,7 +24,7 @@ enum class AnalysisTier(
     ),
     Precise(
         label = "精确",
-        hint = "高质 · 更密运动采样",
+        hint = "更密采样 · 仍封顶预算",
     ),
 }
 
@@ -29,69 +33,90 @@ enum class AnalysisTier(
  */
 data class AnalysisConfig(
     val tier: AnalysisTier,
+    /** Base motion sample rate before duration scaling. */
     val visualFps: Int,
     val motionDiffThreshold: Int,
+    /** Legacy flag; sequential codec path ignores CLOSEST seeks. */
     val useClosestFrame: Boolean,
     val maxAudioMinutes: Int,
+    /** Hard cap on motion energy samples for whole video. */
     val motionMaxSamples: Int,
     val doubleHighlightPass: Boolean,
     val softProminence: Float,
+    val applyMotionBlur: Boolean,
 ) {
     val summary: String
-        get() = "${tier.label} · ${visualFps}fps 运动 · 音轨≤${maxAudioMinutes}分钟"
+        get() = "${tier.label} · 运动≤${visualFps}fps · 最多${motionMaxSamples}点 · 音轨≤${maxAudioMinutes}分钟"
+
+    /**
+     * Duration-aware FPS so a 12-minute match does not run thousands of samples.
+     */
+    fun effectiveMotionFps(durationSec: Double): Int {
+        val d = durationSec.coerceAtLeast(1.0)
+        val byLength = when {
+            d > 15 * 60 -> 2
+            d > 8 * 60 -> 3
+            d > 4 * 60 -> min(visualFps, 4)
+            d > 2 * 60 -> min(visualFps, max(3, visualFps - 1))
+            else -> visualFps
+        }
+        return byLength.coerceIn(2, visualFps)
+    }
+
+    fun effectiveMaxSamples(durationSec: Double): Int {
+        val d = durationSec.coerceAtLeast(1.0)
+        val lengthCap = when {
+            d > 15 * 60 -> 1000
+            d > 10 * 60 -> 1200
+            d > 6 * 60 -> 1400
+            d > 3 * 60 -> motionMaxSamples
+            else -> motionMaxSamples
+        }
+        return min(motionMaxSamples, lengthCap).coerceAtLeast(400)
+    }
 
     companion object {
         fun forTier(tier: AnalysisTier, device: DeviceProfile): AnalysisConfig {
-            // Cap tier by device to avoid OOM while still allowing user choice on strong devices.
             val effective = clampTierToDevice(tier, device)
+            // Do NOT raise FPS with more RAM — that made flagships slower on long videos.
             return when (effective) {
                 AnalysisTier.Fast -> AnalysisConfig(
                     tier = effective,
-                    visualFps = if (device.totalRamMb < 3072) 3 else 4,
+                    visualFps = 3,
                     motionDiffThreshold = 22,
-                    useClosestFrame = false, // SYNC is cheaper
-                    maxAudioMinutes = if (device.totalRamMb < 3072) 12 else 18,
-                    motionMaxSamples = 2400,
+                    useClosestFrame = false,
+                    maxAudioMinutes = if (device.totalRamMb < 3072) 12 else 20,
+                    motionMaxSamples = 900,
                     doubleHighlightPass = false,
                     softProminence = 1.06f,
+                    applyMotionBlur = false,
                 )
                 AnalysisTier.Standard -> AnalysisConfig(
                     tier = effective,
-                    visualFps = when {
-                        device.totalRamMb >= 6144 -> 7
-                        device.totalRamMb >= 4096 -> 6
-                        else -> 5
-                    },
+                    visualFps = 4,
                     motionDiffThreshold = 18,
-                    useClosestFrame = true,
+                    useClosestFrame = false,
                     maxAudioMinutes = if (device.totalRamMb >= 4096) 25 else 18,
-                    motionMaxSamples = 4200,
+                    motionMaxSamples = 1200,
                     doubleHighlightPass = true,
                     softProminence = 1.04f,
+                    applyMotionBlur = false,
                 )
                 AnalysisTier.Precise -> AnalysisConfig(
                     tier = effective,
-                    visualFps = when {
-                        device.totalRamMb >= 8192 && device.cpuCores >= 6 -> 9
-                        device.totalRamMb >= 6144 -> 8
-                        else -> 7
-                    },
+                    visualFps = 5,
                     motionDiffThreshold = 16,
-                    useClosestFrame = true,
+                    useClosestFrame = false,
                     maxAudioMinutes = if (device.totalRamMb >= 6144) 30 else 22,
-                    motionMaxSamples = 5400,
+                    motionMaxSamples = 1800,
                     doubleHighlightPass = true,
                     softProminence = 1.03f,
+                    applyMotionBlur = true,
                 )
             }
         }
 
-        /**
-         * On very weak devices, "Precise" is auto-downgraded to Standard to keep accuracy usable.
-         * User still sees the selection; effective config is honest in summary.
-         */
         fun clampTierToDevice(requested: AnalysisTier, device: DeviceProfile): AnalysisTier {
-            // Check lowest tier first so extreme low-RAM never attempts Precise/Standard.
             if (device.totalRamMb < 2048) {
                 return AnalysisTier.Fast
             }

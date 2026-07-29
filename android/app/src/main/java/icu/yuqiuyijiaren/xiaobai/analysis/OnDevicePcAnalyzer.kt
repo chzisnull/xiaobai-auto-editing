@@ -18,8 +18,8 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 
 /**
- * On-device pipeline mirroring desktop CourtAware + StrictHighlight.
- * Intensity is driven by [AnalysisConfig] (device-recommended or user-selected).
+ * On-device pipeline: audio hits + sequential motion + strict highlight.
+ * Motion uses MediaCodec sequential decode (not full-film random seeks).
  */
 class OnDevicePcAnalyzer : RallyAnalyzer {
 
@@ -30,11 +30,14 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
             val config = request.config
                 ?: AnalysisConfig.forTier(AnalysisTier.Standard, device)
 
+            val motionFps = config.effectiveMotionFps(source.durationSec)
+            val motionCap = config.effectiveMaxSamples(source.durationSec)
+
             emit(
                 progress(
                     AnalysisPhase.Preparing,
-                    0.04f,
-                    "准备 ${config.tier.label} 档 · ${config.visualFps}fps · ${device.classLabel}",
+                    0.03f,
+                    "准备 ${config.tier.label} 档 · 运动${motionFps}fps · 最多${motionCap}点 · ${device.classLabel}",
                 ),
             )
             val uri = Uri.parse(source.uriString)
@@ -44,12 +47,11 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
                 maxOutputSamples = config.maxAudioMinutes * 60 * 16_000,
                 softProminence = config.softProminence,
             )
-            val builder = CourtAwareRallyBuilder(visualFps = config.visualFps)
+            val builder = CourtAwareRallyBuilder(visualFps = motionFps)
             val highlightFilter = StrictHighlightFilter()
 
-            emit(progress(AnalysisPhase.ExtractingAudio, 0.12f, "解码音轨并检测击球（${config.tier.label}）"))
+            emit(progress(AnalysisPhase.ExtractingAudio, 0.08f, "解码音轨并检测击球（${config.tier.label}）"))
             val hitResult = try {
-                System.gc()
                 audioHits.detect(context, uri)
             } catch (error: OutOfMemoryError) {
                 emit(AnalysisUpdate.Error("内存不足，请改用「快速」档或缩短视频后重试"))
@@ -67,17 +69,23 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
                 warnings += "未检测到击球峰值，请检查音轨或手动标注"
             }
 
-            emit(progress(AnalysisPhase.DetectingHits, 0.35f, "提取球场区域运动能量 ${config.visualFps}fps"))
+            emit(
+                progress(
+                    AnalysisPhase.DetectingHits,
+                    0.28f,
+                    "顺序解码提取运动能量 · ${motionFps}fps · ≤${motionCap}点",
+                ),
+            )
             val motionExtractor = CourtMotionExtractor(
-                visualFps = config.visualFps,
+                visualFps = motionFps,
                 diffThreshold = config.motionDiffThreshold,
-                useClosestFrame = config.useClosestFrame,
-                maxSamplesCap = config.motionMaxSamples,
+                useClosestFrame = false,
+                maxSamplesCap = motionCap,
+                applyBlur = config.applyMotionBlur,
                 courtRoi = request.courtRoi.asPairs(),
             )
             val motion = try {
-                System.gc()
-                motionExtractor.extract(context, uri, source.durationSec)
+                motionExtractor.extract(context, uri, source.durationSec, onProgress = null)
             } catch (_: OutOfMemoryError) {
                 warnings += "运动分析内存不足，已退化为仅音频"
                 null
@@ -85,10 +93,18 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
                 null
             }
             if (motion == null || motion.isEmpty) {
-                warnings += "球场运动提取失败/为空，已退化为仅音频分组（建议标定 ROI 或提高识别强度）"
+                warnings += "球场运动提取失败/为空，已退化为仅音频分组"
+            } else {
+                emit(
+                    progress(
+                        AnalysisPhase.DetectingHits,
+                        0.68f,
+                        "运动采样完成 · ${motion.timestamps.size} 点",
+                    ),
+                )
             }
 
-            emit(progress(AnalysisPhase.BuildingRallies, 0.72f, "组装回合并应用高光过滤"))
+            emit(progress(AnalysisPhase.BuildingRallies, 0.78f, "组装回合并应用高光过滤"))
             val coarse = builder.build(hitResult.hitsSec, motion)
             val filtered = highlightFilter.apply(coarse, hitResult.hitsSec, motion)
             val refined = if (config.doubleHighlightPass) {
@@ -113,8 +129,7 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
 
             val doneMsg = when {
                 rallies.isEmpty() -> "未识别到有效回合，可用「打点」或手动添加"
-                warnings.isNotEmpty() -> "识别完成 · ${rallies.size} 个回合 · ${config.tier.label}档"
-                else -> "识别完成 · ${rallies.size} 个回合 · ${config.tier.label}档"
+                else -> "识别完成 · ${rallies.size} 个回合 · ${config.tier.label}档 · ${motionFps}fps"
             }
             emit(progress(AnalysisPhase.Done, 1f, doneMsg))
             emit(AnalysisUpdate.Result(rallies, warnings))

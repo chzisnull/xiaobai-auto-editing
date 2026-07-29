@@ -18,6 +18,7 @@ import icu.yuqiuyijiaren.xiaobai.domain.EditorEvent
 import icu.yuqiuyijiaren.xiaobai.domain.EditorUiState
 import icu.yuqiuyijiaren.xiaobai.domain.PlaybackCommand
 import icu.yuqiuyijiaren.xiaobai.domain.Rally
+import icu.yuqiuyijiaren.xiaobai.export.GallerySaver
 import icu.yuqiuyijiaren.xiaobai.export.LocalExporter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -109,7 +110,7 @@ class EditorViewModel(
             EditorEvent.Export -> export()
             EditorEvent.ClearError -> _uiState.update { it.copy(errorMessage = null) }
             EditorEvent.ClearExportPath -> _uiState.update {
-                it.copy(exportPath = null, shareRequested = false)
+                it.copy(exportPath = null, exportGalleryName = null, shareRequested = false)
             }
             EditorEvent.ClearPlaybackCommand -> _uiState.update { it.copy(playback = null) }
         }
@@ -205,6 +206,7 @@ class EditorViewModel(
                     rallies = emptyList(),
                     selectedRallyIndex = null,
                     exportPath = null,
+                    exportGalleryName = null,
                     shareRequested = false,
                     errorMessage = null,
                     analysisWarnings = emptyList(),
@@ -511,16 +513,27 @@ class EditorViewModel(
                     isExporting = true,
                     errorMessage = null,
                     exportPath = null,
+                    exportGalleryName = null,
                     shareRequested = false,
                 )
             }
             try {
-                val file = exporter.exportMerged(getApplication(), source, rallies)
+                val app = getApplication<Application>()
+                val file = exporter.exportMerged(app, source, rallies)
+                if (token != sessionToken) return@launch
+                val displayName = "xiaobai_${System.currentTimeMillis()}.mp4"
+                val galleryName = try {
+                    GallerySaver.saveVideoToGallery(app, file, displayName).displayName
+                } catch (galleryError: Exception) {
+                    if (galleryError is kotlinx.coroutines.CancellationException) throw galleryError
+                    null
+                }
                 if (token != sessionToken) return@launch
                 _uiState.update {
                     it.copy(
                         isExporting = false,
                         exportPath = file.absolutePath,
+                        exportGalleryName = galleryName,
                         shareRequested = true,
                     )
                 }

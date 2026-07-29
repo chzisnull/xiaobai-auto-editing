@@ -126,6 +126,8 @@ data class EditorUiState(
     val analysis: AnalysisProgress = AnalysisProgress(),
     val isExporting: Boolean = false,
     val exportPath: String? = null,
+    /** Display name written into Movies/Xiaobai after a successful gallery save. */
+    val exportGalleryName: String? = null,
     val shareRequested: Boolean = false,
     val errorMessage: String? = null,
     val courtRoi: CourtRoi = CourtRoi.DEFAULT,

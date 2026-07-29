@@ -27,10 +27,8 @@ class AnalysisConfigTest {
 
     @Test
     fun preciseDowngradesOnLowRam() {
-        // <3GB: Precise → Standard (still usable quality)
         val midLow = AnalysisConfig.forTier(AnalysisTier.Precise, device(ramMb = 2048))
         assertEquals(AnalysisTier.Standard, midLow.tier)
-        // <2GB: force Fast
         val veryLow = AnalysisConfig.forTier(AnalysisTier.Precise, device(ramMb = 1536))
         assertEquals(AnalysisTier.Fast, veryLow.tier)
     }
@@ -44,5 +42,22 @@ class AnalysisConfigTest {
         assertTrue(standard.visualFps > fast.visualFps)
         assertTrue(precise.visualFps >= standard.visualFps)
         assertTrue(precise.motionDiffThreshold <= standard.motionDiffThreshold)
+        // High RAM must not unlock crazy sample counts
+        assertTrue(precise.motionMaxSamples <= 2000)
+    }
+
+    @Test
+    fun longVideoReducesEffectiveFpsAndSamples() {
+        val cfg = AnalysisConfig.forTier(AnalysisTier.Precise, device(ramMb = 16384, cores = 8))
+        assertTrue(cfg.effectiveMotionFps(12 * 60.0) <= 3)
+        assertTrue(cfg.effectiveMaxSamples(12 * 60.0) <= 1200)
+        assertTrue(cfg.effectiveMotionFps(60.0) >= cfg.effectiveMotionFps(12 * 60.0))
+    }
+
+    @Test
+    fun highEndDoesNotInflateFpsVsMid() {
+        val high = AnalysisConfig.forTier(AnalysisTier.Standard, device(ramMb = 16384, cores = 8))
+        val mid = AnalysisConfig.forTier(AnalysisTier.Standard, device(ramMb = 4096, cores = 4))
+        assertEquals(mid.visualFps, high.visualFps)
     }
 }

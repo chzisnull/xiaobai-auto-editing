@@ -50,12 +50,12 @@ object DeviceProfiler {
             score >= 50 -> "均衡"
             else -> "省电"
         }
+        // Prefer Standard even on flagships: Precise is opt-in denser sampling with hard caps.
+        // (Auto-Precise + old random seeks made high-end phones feel slow on long matches.)
         val recommended = when {
-            score >= 75 -> AnalysisTier.Precise
             score >= 45 -> AnalysisTier.Standard
             else -> AnalysisTier.Fast
         }
-        // Emulators with lots of RAM can still do Standard/Precise, but default Standard if borderline
         val recommendedFinal = if (isEmulator && totalRamMb >= 6144 && recommended == AnalysisTier.Fast) {
             AnalysisTier.Standard
         } else {

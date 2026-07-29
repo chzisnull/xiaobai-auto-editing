@@ -5,6 +5,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -16,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -23,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,7 +41,7 @@ import icu.yuqiuyijiaren.xiaobai.ui.theme.Muted
 import kotlin.math.roundToInt
 
 /**
- * Compact sticky trim bar under the video — designed for one-thumb review without scrolling.
+ * Full trim controls. Parent should scroll so nothing is clipped on short screens.
  */
 @Composable
 fun RallyInspector(
@@ -73,9 +75,11 @@ fun RallyInspector(
             .clip(RoundedCornerShape(14.dp))
             .background(Color.White.copy(alpha = 0.96f))
             .border(1.dp, Color(0x28767680), RoundedCornerShape(14.dp))
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        // Navigation + segment info + play
+        Text("精剪审核", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
+        Spacer(Modifier.height(4.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -83,7 +87,6 @@ fun RallyInspector(
             IconButton(
                 onClick = onPrev,
                 enabled = index != null && index > 0,
-                modifier = Modifier.width(36.dp),
             ) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "上一段")
             }
@@ -96,86 +99,149 @@ fun RallyInspector(
                         "第 %02d / %02d".format(index + 1, total.coerceAtLeast(1)),
                         fontWeight = FontWeight.SemiBold,
                         color = Ink,
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
                     )
                     Text(
-                        "${formatClock(rally.startSec)}–${formatClock(rally.endSec)} · ${"%.1f".format(rally.durationSec)}s · 播头 ${formatClock(playheadSec)}",
+                        "${formatClock(rally.startSec)} – ${formatClock(rally.endSec)} · ${"%.1f".format(rally.durationSec)}s",
+                        color = Muted,
+                        fontSize = 12.sp,
+                    )
+                    Text(
+                        "播头 ${formatClock(playheadSec)}",
                         color = Muted,
                         fontSize = 11.sp,
                     )
                 } else {
-                    Text("未选中回合", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
-                    Text("播头 ${formatClock(playheadSec)} · 可打点新建", color = Muted, fontSize = 11.sp)
+                    Text("未选中回合", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 15.sp)
+                    Text("播头 ${formatClock(playheadSec)} · 可打点新建", color = Muted, fontSize = 12.sp)
                 }
             }
             IconButton(
                 onClick = onNext,
                 enabled = index != null && index < total - 1,
-                modifier = Modifier.width(36.dp),
             ) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "下一段")
             }
         }
 
-        Spacer(Modifier.height(4.dp))
-        Button(
-            onClick = onPlaySelected,
-            enabled = rally != null,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Blue),
-            shape = RoundedCornerShape(10.dp),
-        ) {
-            Icon(Icons.Default.PlayArrow, contentDescription = null)
-            Spacer(Modifier.width(4.dp))
-            Text("播放本段")
-        }
-
-        Spacer(Modifier.height(6.dp))
-        // Single scrollable action row — primary trim tools
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ActionChip("删除", enabled = rally != null, danger = true, onClick = onDelete)
-            ActionChip("起点=播头", enabled = rally != null, onClick = onSetStartAtPlayhead)
-            ActionChip("终点=播头", enabled = rally != null, onClick = onSetEndAtPlayhead)
-            ActionChip("入-0.2", enabled = rally != null) { onNudgeStart(-0.2) }
-            ActionChip("入+0.2", enabled = rally != null) { onNudgeStart(0.2) }
-            ActionChip("出-0.2", enabled = rally != null) { onNudgeEnd(-0.2) }
-            ActionChip("出+0.2", enabled = rally != null) { onNudgeEnd(0.2) }
-            ActionChip("←0.2", enabled = rally != null) { onNudgeBoth(-0.2) }
-            ActionChip("0.2→", enabled = rally != null) { onNudgeBoth(0.2) }
-            ActionChip("拆分", enabled = rally != null, onClick = onSplit)
-            ActionChip("合并下段", enabled = canMergeNext, onClick = onMergeNext)
-        }
-
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            ActionChip(
-                label = if (rangeMarkInSec != null) "入 ${formatClock(rangeMarkInSec)}" else "打入点",
-                onClick = onMarkIn,
-            )
-            ActionChip(
-                label = if (rangeMarkOutSec != null) "出 ${formatClock(rangeMarkOutSec)}" else "打出点",
-                onClick = onMarkOut,
-            )
-            if (rangeMarkInSec != null || rangeMarkOutSec != null) {
-                TextButton(onClick = onClearMarks) {
-                    Text("清除标记", color = Muted, fontSize = 12.sp)
-                }
+            Button(
+                onClick = onPlaySelected,
+                enabled = rally != null,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(containerColor = Blue),
+                shape = RoundedCornerShape(10.dp),
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
+                Spacer(Modifier.width(4.dp))
+                Text("播放本段")
+            }
+            OutlinedButton(
+                onClick = onDelete,
+                enabled = rally != null,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+            ) {
+                Icon(
+                    Icons.Default.Delete,
+                    contentDescription = null,
+                    tint = if (rally != null) Color(0xFFFF3B30) else Muted,
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("删除本段", color = if (rally != null) Color(0xFFFF3B30) else Muted)
             }
         }
 
-        if (expanded) {
-            Spacer(Modifier.height(4.dp))
-            Text("提示：时间轴拖左右柄可修剪，拖中间平移", color = Muted, fontSize = 10.sp)
+        Spacer(Modifier.height(10.dp))
+        Text("以播头设置", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedButton(
+                onClick = onSetStartAtPlayhead,
+                enabled = rally != null,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+            ) { Text("设为起点") }
+            OutlinedButton(
+                onClick = onSetEndAtPlayhead,
+                enabled = rally != null,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+            ) { Text("设为终点") }
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Text("微调 / 结构", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(4.dp))
+        // Wrap chips so nothing is hidden off-screen
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                ActionChip("入-0.2", enabled = rally != null) { onNudgeStart(-0.2) }
+                ActionChip("入+0.2", enabled = rally != null) { onNudgeStart(0.2) }
+                ActionChip("出-0.2", enabled = rally != null) { onNudgeEnd(-0.2) }
+                ActionChip("出+0.2", enabled = rally != null) { onNudgeEnd(0.2) }
+                ActionChip("整体-0.2", enabled = rally != null) { onNudgeBoth(-0.2) }
+                ActionChip("整体+0.2", enabled = rally != null) { onNudgeBoth(0.2) }
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedButton(
+                    onClick = onSplit,
+                    enabled = rally != null,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                ) { Text("播头拆分") }
+                OutlinedButton(
+                    onClick = onMergeNext,
+                    enabled = canMergeNext,
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(10.dp),
+                ) { Text("合并下段") }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+        Text("新建片段", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedButton(
+                onClick = onMarkIn,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+            ) {
+                Text(if (rangeMarkInSec != null) "入点 ${formatClock(rangeMarkInSec)}" else "打入点")
+            }
+            OutlinedButton(
+                onClick = onMarkOut,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(10.dp),
+            ) {
+                Text(if (rangeMarkOutSec != null) "出点 ${formatClock(rangeMarkOutSec)}" else "打出点")
+            }
+            if (rangeMarkInSec != null || rangeMarkOutSec != null) {
+                OutlinedButton(
+                    onClick = onClearMarks,
+                    shape = RoundedCornerShape(10.dp),
+                ) { Text("清除") }
+            }
         }
     }
 }
@@ -184,23 +250,18 @@ fun RallyInspector(
 private fun ActionChip(
     label: String,
     enabled: Boolean = true,
-    danger: Boolean = false,
     onClick: () -> Unit,
 ) {
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(10.dp),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
         modifier = Modifier.height(34.dp),
     ) {
         Text(
             label,
-            color = when {
-                !enabled -> Muted
-                danger -> Color(0xFFFF3B30)
-                else -> Blue
-            },
+            color = if (enabled) Blue else Muted,
             fontSize = 12.sp,
             maxLines = 1,
         )

@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CropFree
@@ -33,8 +36,8 @@ import icu.yuqiuyijiaren.xiaobai.ui.theme.Ink
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Muted
 
 /**
- * Compact frosted-style header: device capability + recognition intensity chips.
- * No large product title (Stitch "Precision Motion" editor bar).
+ * Compact header: device line + recognition intensity.
+ * Only change from prior version: status-bar top inset so content is not under the notch.
  */
 @Composable
 fun EditorTopBar(
@@ -56,7 +59,8 @@ fun EditorTopBar(
         modifier = modifier
             .fillMaxWidth()
             .background(Color(0xCCF2F2F7))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .windowInsetsPadding(WindowInsets.statusBars)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -101,14 +105,7 @@ fun EditorTopBar(
             }
         }
 
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = "识别强度",
-            color = Muted,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
-        )
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(6.dp))
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -130,7 +127,7 @@ fun EditorTopBar(
                         .clip(RoundedCornerShape(10.dp))
                         .background(if (selected) Blue else Color.Transparent)
                         .clickable(enabled = !analyzing) { onSelectTier(tier) }
-                        .padding(vertical = 8.dp),
+                        .padding(vertical = 7.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -143,16 +140,16 @@ fun EditorTopBar(
                 }
             }
         }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
         Text(
             text = if (analyzing) {
                 "分析中不可切换强度"
             } else {
-                "${selectedTier.hint} · $configSummary"
+                configSummary
             },
             color = Muted,
             fontSize = 10.sp,
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     }

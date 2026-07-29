@@ -127,14 +127,19 @@ fun EditorScreen(viewModel: EditorViewModel) {
         }
     }
 
-    LaunchedEffect(state.exportPath, state.shareRequested) {
+    LaunchedEffect(state.exportPath, state.shareRequested, state.exportGalleryName) {
         val path = state.exportPath
         if (path.isNullOrBlank()) return@LaunchedEffect
         if (state.shareRequested) {
-            val shared = shareExportedVideo(context, path)
-            snackbar.showSnackbar(
-                if (shared) "导出完成，已打开分享面板" else "已导出：$path",
-            )
+            val galleryLabel = state.exportGalleryName
+            val savedMsg = if (!galleryLabel.isNullOrBlank()) {
+                "已保存到相册 Movies/Xiaobai/$galleryLabel"
+            } else {
+                "合并完成；相册写入失败，可从分享面板另存"
+            }
+            snackbar.showSnackbar(savedMsg)
+            // Optional share sheet after local save
+            shareExportedVideo(context, path)
             viewModel.onEvent(EditorEvent.ClearExportPath)
         }
     }
@@ -162,7 +167,21 @@ fun EditorScreen(viewModel: EditorViewModel) {
         },
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            TimelineBar(state, viewModel)
+            // Export must live in bottomBar so it is never clipped by the middle Column.
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xF2F2F2F7)),
+            ) {
+                ExportButton(
+                    state = state,
+                    viewModel = viewModel,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                )
+                TimelineBar(state, viewModel)
+            }
         },
     ) { padding ->
         BoxWithConstraints(
@@ -220,12 +239,6 @@ private fun TimelineBar(state: EditorUiState, viewModel: EditorViewModel) {
                 MetricChip("精简", "${state.reductionPercent}%")
             }
         }
-        Text(
-            "拖左右柄修剪 · 拖中间平移 · 贴合播头吸附 · 双指缩放",
-            color = Muted,
-            fontSize = 11.sp,
-        )
-        Spacer(Modifier.height(4.dp))
         ZoomableRallyTimeline(
             durationSec = state.source?.durationSec ?: 0.0,
             rallies = state.rallies,
@@ -252,69 +265,59 @@ private fun PortraitBody(
     onPickGallery: () -> Unit,
     onPickFile: () -> Unit,
 ) {
-    // Video + trim bar stay pinned; only the rally list scrolls.
-    Column(
+    // Full-page scroll so every control is reachable; export stays in bottomBar.
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Spacer(Modifier.height(8.dp))
-        ToolbarRow(state, viewModel, onPickGallery, onPickFile)
-        Spacer(Modifier.height(8.dp))
-        VideoCard(state, viewModel)
-        Spacer(Modifier.height(8.dp))
+        item { ToolbarRow(state, viewModel, onPickGallery, onPickFile) }
+        item { VideoCard(state, viewModel) }
         if (state.isAnalyzing ||
             (state.analysis.message.isNotBlank() &&
                 state.analysis.phase != icu.yuqiuyijiaren.xiaobai.domain.AnalysisPhase.Idle)
         ) {
-            AnalysisCard(state, viewModel)
-            Spacer(Modifier.height(8.dp))
+            item { AnalysisCard(state, viewModel) }
         }
-        RallyInspector(
-            rally = state.selectedRally,
-            index = state.selectedRallyIndex,
-            total = state.rallies.size,
-            playheadSec = state.playheadSec,
-            rangeMarkInSec = state.rangeMarkInSec,
-            rangeMarkOutSec = state.rangeMarkOutSec,
-            onPlaySelected = { viewModel.onEvent(EditorEvent.PlaySelected) },
-            onPrev = { viewModel.onEvent(EditorEvent.SelectPrevious) },
-            onNext = { viewModel.onEvent(EditorEvent.SelectNext) },
-            onSetStartAtPlayhead = { viewModel.onEvent(EditorEvent.SetSelectedStartAtPlayhead) },
-            onSetEndAtPlayhead = { viewModel.onEvent(EditorEvent.SetSelectedEndAtPlayhead) },
-            onNudgeStart = { viewModel.onEvent(EditorEvent.NudgeSelectedEdge(startDelta = it)) },
-            onNudgeEnd = { viewModel.onEvent(EditorEvent.NudgeSelectedEdge(endDelta = it)) },
-            onNudgeBoth = { viewModel.onEvent(EditorEvent.NudgeSelected(it)) },
-            onMarkIn = { viewModel.onEvent(EditorEvent.MarkRangeStartAtPlayhead) },
-            onMarkOut = { viewModel.onEvent(EditorEvent.MarkRangeEndAtPlayhead) },
-            onClearMarks = { viewModel.onEvent(EditorEvent.ClearRangeMarks) },
-            onSplit = { viewModel.onEvent(EditorEvent.SplitSelectedAtPlayhead) },
-            onMergeNext = { viewModel.onEvent(EditorEvent.MergeSelectedWithNext) },
-            onDelete = {
-                state.selectedRallyIndex?.let { viewModel.onEvent(EditorEvent.DeleteRally(it)) }
-            },
-            canMergeNext = state.selectedRallyIndex != null &&
-                (state.selectedRallyIndex ?: 0) < state.rallies.lastIndex,
-        )
-        Spacer(Modifier.height(8.dp))
-        LazyColumn(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentPadding = PaddingValues(bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            item { RallyListHeader(state, viewModel) }
-            if (state.rallies.isEmpty()) {
-                item {
-                    Text("暂无回合，请识别或用入点/出点新建", color = Muted, fontSize = 13.sp)
-                }
-            } else {
-                itemsIndexed(state.rallies) { index, rally ->
-                    RallyListItem(index, rally, state.selectedRallyIndex == index, viewModel)
-                }
+        item {
+            RallyInspector(
+                rally = state.selectedRally,
+                index = state.selectedRallyIndex,
+                total = state.rallies.size,
+                playheadSec = state.playheadSec,
+                rangeMarkInSec = state.rangeMarkInSec,
+                rangeMarkOutSec = state.rangeMarkOutSec,
+                onPlaySelected = { viewModel.onEvent(EditorEvent.PlaySelected) },
+                onPrev = { viewModel.onEvent(EditorEvent.SelectPrevious) },
+                onNext = { viewModel.onEvent(EditorEvent.SelectNext) },
+                onSetStartAtPlayhead = { viewModel.onEvent(EditorEvent.SetSelectedStartAtPlayhead) },
+                onSetEndAtPlayhead = { viewModel.onEvent(EditorEvent.SetSelectedEndAtPlayhead) },
+                onNudgeStart = { viewModel.onEvent(EditorEvent.NudgeSelectedEdge(startDelta = it)) },
+                onNudgeEnd = { viewModel.onEvent(EditorEvent.NudgeSelectedEdge(endDelta = it)) },
+                onNudgeBoth = { viewModel.onEvent(EditorEvent.NudgeSelected(it)) },
+                onMarkIn = { viewModel.onEvent(EditorEvent.MarkRangeStartAtPlayhead) },
+                onMarkOut = { viewModel.onEvent(EditorEvent.MarkRangeEndAtPlayhead) },
+                onClearMarks = { viewModel.onEvent(EditorEvent.ClearRangeMarks) },
+                onSplit = { viewModel.onEvent(EditorEvent.SplitSelectedAtPlayhead) },
+                onMergeNext = { viewModel.onEvent(EditorEvent.MergeSelectedWithNext) },
+                onDelete = {
+                    state.selectedRallyIndex?.let { viewModel.onEvent(EditorEvent.DeleteRally(it)) }
+                },
+                canMergeNext = state.selectedRallyIndex != null &&
+                    (state.selectedRallyIndex ?: 0) < state.rallies.lastIndex,
+            )
+        }
+        item { RallyListHeader(state, viewModel) }
+        if (state.rallies.isEmpty()) {
+            item {
+                Text("暂无回合，请识别或用入点/出点新建", color = Muted, fontSize = 13.sp)
             }
-            item { ExportButton(state, viewModel) }
+        } else {
+            itemsIndexed(state.rallies) { index, rally ->
+                RallyListItem(index, rally, state.selectedRallyIndex == index, viewModel)
+            }
         }
     }
 }
@@ -378,13 +381,19 @@ private fun LandscapeBody(
         Column(
             modifier = Modifier
                 .weight(0.42f)
-                .fillMaxHeight()
-                .verticalScroll(rememberScrollState()),
+                .fillMaxHeight(),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             RallyListHeader(state, viewModel)
-            state.rallies.forEachIndexed { index, rally ->
-                RallyListItem(index, rally, state.selectedRallyIndex == index, viewModel)
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                state.rallies.forEachIndexed { index, rally ->
+                    RallyListItem(index, rally, state.selectedRallyIndex == index, viewModel)
+                }
             }
             ExportButton(state, viewModel)
         }
@@ -507,7 +516,7 @@ private fun AnalysisCard(state: EditorUiState, viewModel: EditorViewModel) {
         colors = CardDefaults.cardColors(containerColor = Color(0x14007AFF)),
         shape = RoundedCornerShape(12.dp),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (state.isAnalyzing) {
                     CircularProgressIndicator(
@@ -517,10 +526,15 @@ private fun AnalysisCard(state: EditorUiState, viewModel: EditorViewModel) {
                     )
                     Spacer(Modifier.width(8.dp))
                 }
-                Text(state.analysis.message.ifBlank { "准备中" }, color = Ink, fontSize = 13.sp)
+                Text(
+                    state.analysis.message.ifBlank { "准备中" },
+                    color = Ink,
+                    fontSize = 13.sp,
+                    maxLines = 2,
+                )
             }
             if (state.isAnalyzing) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(6.dp))
                 LinearProgressIndicator(
                     progress = { state.analysis.percent.coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth(),
@@ -606,11 +620,15 @@ private fun RallyListItem(
 }
 
 @Composable
-private fun ExportButton(state: EditorUiState, viewModel: EditorViewModel) {
+private fun ExportButton(
+    state: EditorUiState,
+    viewModel: EditorViewModel,
+    modifier: Modifier = Modifier,
+) {
     Button(
         onClick = { viewModel.onEvent(EditorEvent.Export) },
         enabled = state.rallies.isNotEmpty() && !state.isExporting && !state.isAnalyzing,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(containerColor = Blue),
     ) {
@@ -621,11 +639,17 @@ private fun ExportButton(state: EditorUiState, viewModel: EditorViewModel) {
                 strokeWidth = 2.dp,
             )
             Spacer(Modifier.width(8.dp))
-            Text("正在本地导出…")
+            Text("正在导出并保存…")
         } else {
             Icon(Icons.Default.IosShare, contentDescription = null)
             Spacer(Modifier.width(8.dp))
-            Text("导出合并视频（端侧）")
+            Text(
+                if (state.rallies.isEmpty()) {
+                    "导出合并视频到相册"
+                } else {
+                    "导出到相册 · ${state.rallies.size} 段"
+                },
+            )
         }
     }
 }
