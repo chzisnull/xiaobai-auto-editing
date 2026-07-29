@@ -31,7 +31,7 @@ jobs:
       - name: Resolve version
         shell: bash
         run: |
-          # v0.4.1-android -> 0.4.1-android
+          # v0.4.6-android -> 0.4.6-android (keep full tag body for APK name)
           version="${GITHUB_REF_NAME#v}"
           echo "XIAOBAI_VERSION=$version" >> "$GITHUB_ENV"
           echo "Release version: $version"
@@ -44,8 +44,9 @@ jobs:
           chmod +x gradlew
           ./gradlew :app:assembleDebug --no-daemon
           mkdir -p ../release
+          # Tag already ends with -android; do not append another -android.
           cp app/build/outputs/apk/debug/app-debug.apk \
-            "../release/XiaobaiAutoEditing-${XIAOBAI_VERSION}-android-debug.apk"
+            "../release/XiaobaiAutoEditing-${XIAOBAI_VERSION}-debug.apk"
           ls -lh ../release/
 
       - name: Create GitHub Release (Android only)
