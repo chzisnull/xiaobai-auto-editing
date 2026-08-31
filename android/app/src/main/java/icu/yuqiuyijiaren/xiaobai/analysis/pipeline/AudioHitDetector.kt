@@ -25,6 +25,8 @@ class AudioHitDetector(
     /** Hard cap (~20 min @ 16 kHz) to avoid OOM on very long matches. */
     private val maxOutputSamples: Int = 16_000 * 60 * 20,
     private val softProminence: Float = 1.04f,
+    /** Envelope MAD multiplier. Higher = fewer gym-noise / adjacent-court hits. */
+    private val hitMadK: Float = 6.6f,
 ) {
     data class Result(
         val hitsSec: DoubleArray,
@@ -282,7 +284,7 @@ class AudioHitDetector(
         deviations.sort()
         val mad = percentileSorted(deviations, 0.5)
         val normalMad = mad * 1.4826f
-        val thr = med + 4.5f * normalMad
+        val thr = med + hitMadK * normalMad
 
         val minGap = max(1, (minHitIntervalSec * sr).toInt())
         val peaks = ArrayList<Double>(256)

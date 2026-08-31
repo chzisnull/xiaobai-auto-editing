@@ -18,6 +18,7 @@ import icu.yuqiuyijiaren.xiaobai.domain.EditorEvent
 import icu.yuqiuyijiaren.xiaobai.domain.EditorUiState
 import icu.yuqiuyijiaren.xiaobai.domain.PlaybackCommand
 import icu.yuqiuyijiaren.xiaobai.domain.Rally
+import icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus
 import icu.yuqiuyijiaren.xiaobai.export.GallerySaver
 import icu.yuqiuyijiaren.xiaobai.export.LocalExporter
 import kotlinx.coroutines.Job
@@ -107,6 +108,10 @@ class EditorViewModel(
             is EditorEvent.UpdateCourtRoiPoint -> updateRoiPoint(event.index, event.x, event.y)
             EditorEvent.ResetCourtRoi -> _uiState.update { it.copy(courtRoi = CourtRoi.DEFAULT) }
             is EditorEvent.SetAnalysisTier -> setTier(event.tier)
+            is EditorEvent.SetRallyStatus -> setRallyStatus(event.index, event.status)
+            EditorEvent.MergeAdjacentRallies -> mergeAdjacentRallies()
+            EditorEvent.ToggleSmartSkip -> toggleSmartSkip()
+            EditorEvent.ToggleLoopRally -> toggleLoopRally()
             EditorEvent.Export -> export()
             EditorEvent.ClearError -> _uiState.update { it.copy(errorMessage = null) }
             EditorEvent.ClearExportPath -> _uiState.update {
@@ -284,7 +289,7 @@ class EditorViewModel(
             val selected = when {
                 next.isEmpty() -> null
                 state.selectedRallyIndex == null -> null
-                state.selectedRallyIndex!! >= next.size -> next.lastIndex
+                state.selectedRallyIndex >= next.size -> next.lastIndex
                 else -> state.selectedRallyIndex
             }
             state.copy(rallies = next, selectedRallyIndex = selected)
@@ -398,6 +403,46 @@ class EditorViewModel(
             next[index] = rally.copy(endSec = t).clamp(duration)
             state.copy(rallies = next)
         }
+    }
+
+    private fun setRallyStatus(index: Int, status: ReviewStatus) {
+        val count = _uiState.value.rallies.size
+        if (index !in 0 until count) return
+        pushUndo()
+        _uiState.update { state ->
+            val next = state.rallies.toMutableList()
+            next[index] = next[index].copy(reviewStatus = status)
+            state.copy(rallies = next)
+        }
+    }
+
+    private fun mergeAdjacentRallies() {
+        val current = _uiState.value.rallies
+        if (current.size < 2) return
+        pushUndo()
+        val sorted = current.sortedBy { it.startSec }
+        val merged = mutableListOf(sorted.first())
+        for (i in 1 until sorted.size) {
+            val prev = merged.last()
+            val curr = sorted[i]
+            if (curr.startSec - prev.endSec <= 1.0) {
+                merged[merged.lastIndex] = prev.copy(
+                    endSec = max(prev.endSec, curr.endSec),
+                    confidence = min(prev.confidence, curr.confidence),
+                )
+            } else {
+                merged.add(curr)
+            }
+        }
+        _uiState.update { it.copy(rallies = merged, selectedRallyIndex = null) }
+    }
+
+    private fun toggleSmartSkip() {
+        _uiState.update { it.copy(smartSkip = !it.smartSkip) }
+    }
+
+    private fun toggleLoopRally() {
+        _uiState.update { it.copy(loopRally = !it.loopRally) }
     }
 
     private fun markRangeStart() {

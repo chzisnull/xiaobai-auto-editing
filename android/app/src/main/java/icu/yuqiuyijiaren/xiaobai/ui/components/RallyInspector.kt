@@ -35,7 +35,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import icu.yuqiuyijiaren.xiaobai.domain.Rally
+import icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus
+import icu.yuqiuyijiaren.xiaobai.ui.theme.Amber
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Blue
+import icu.yuqiuyijiaren.xiaobai.ui.theme.Green
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Ink
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Muted
 import kotlin.math.roundToInt
@@ -67,7 +70,11 @@ fun RallyInspector(
     onDelete: () -> Unit,
     canMergeNext: Boolean,
     modifier: Modifier = Modifier,
-    expanded: Boolean = false,
+    onSetReviewStatus: (ReviewStatus) -> Unit = {},
+    smartSkip: Boolean = false,
+    onToggleSmartSkip: () -> Unit = {},
+    loopRally: Boolean = false,
+    onToggleLoop: () -> Unit = {},
 ) {
     Column(
         modifier = modifier
@@ -77,7 +84,27 @@ fun RallyInspector(
             .border(1.dp, Color(0x28767680), RoundedCornerShape(14.dp))
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
-        Text("精剪审核", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("精剪审核", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 14.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                ActionChip(
+                    label = if (loopRally) "单曲循环" else "循环播放",
+                    enabled = rally != null,
+                    active = loopRally,
+                    onClick = onToggleLoop,
+                )
+                ActionChip(
+                    label = if (smartSkip) "连续有效" else "跳过死球",
+                    enabled = total > 0,
+                    active = smartSkip,
+                    onClick = onToggleSmartSkip,
+                )
+            }
+        }
         Spacer(Modifier.height(4.dp))
 
         Row(
@@ -121,6 +148,43 @@ fun RallyInspector(
                 enabled = index != null && index < total - 1,
             ) {
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "下一段")
+            }
+        }
+
+        if (rally != null) {
+            Spacer(Modifier.height(6.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                StatusChip(
+                    label = "正常",
+                    selected = rally.reviewStatus == ReviewStatus.Normal,
+                    color = Blue,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSetReviewStatus(ReviewStatus.Normal) },
+                )
+                StatusChip(
+                    label = "已通过",
+                    selected = rally.reviewStatus == ReviewStatus.Approved,
+                    color = Green,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSetReviewStatus(ReviewStatus.Approved) },
+                )
+                StatusChip(
+                    label = "待复核",
+                    selected = rally.reviewStatus == ReviewStatus.Flagged,
+                    color = Amber,
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSetReviewStatus(ReviewStatus.Flagged) },
+                )
+                StatusChip(
+                    label = "弃用",
+                    selected = rally.reviewStatus == ReviewStatus.Rejected,
+                    color = Color(0xFFFF3B30),
+                    modifier = Modifier.weight(1f),
+                    onClick = { onSetReviewStatus(ReviewStatus.Rejected) },
+                )
             }
         }
 
@@ -250,19 +314,49 @@ fun RallyInspector(
 private fun ActionChip(
     label: String,
     enabled: Boolean = true,
+    active: Boolean = false,
     onClick: () -> Unit,
 ) {
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
         shape = RoundedCornerShape(10.dp),
-        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
-        modifier = Modifier.height(34.dp),
+        colors = if (active) ButtonDefaults.outlinedButtonColors(containerColor = Blue.copy(alpha = 0.12f)) else ButtonDefaults.outlinedButtonColors(),
+        border = if (active) androidx.compose.foundation.BorderStroke(1.dp, Blue) else ButtonDefaults.outlinedButtonBorder,
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+        modifier = Modifier.height(30.dp),
     ) {
         Text(
             label,
-            color = if (enabled) Blue else Muted,
-            fontSize = 12.sp,
+            color = if (active) Blue else if (enabled) Blue else Muted,
+            fontSize = 11.sp,
+            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1,
+        )
+    }
+}
+
+@Composable
+private fun StatusChip(
+    label: String,
+    selected: Boolean,
+    color: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    OutlinedButton(
+        onClick = onClick,
+        shape = RoundedCornerShape(8.dp),
+        colors = if (selected) ButtonDefaults.outlinedButtonColors(containerColor = color.copy(alpha = 0.15f)) else ButtonDefaults.outlinedButtonColors(),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (selected) color else Color(0x28767680)),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+        modifier = modifier.height(30.dp),
+    ) {
+        Text(
+            label,
+            color = if (selected) color else Muted,
+            fontSize = 11.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
             maxLines = 1,
         )
     }

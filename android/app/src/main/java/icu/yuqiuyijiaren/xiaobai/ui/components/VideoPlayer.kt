@@ -47,6 +47,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import icu.yuqiuyijiaren.xiaobai.domain.PlaybackCommand
+import icu.yuqiuyijiaren.xiaobai.domain.Rally
 import icu.yuqiuyijiaren.xiaobai.domain.VideoSource
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Blue
 import kotlin.math.abs
@@ -63,6 +64,10 @@ fun LocalVideoPlayer(
     onPlayheadChange: (Double) -> Unit,
     playback: PlaybackCommand? = null,
     onPlaybackConsumed: () -> Unit = {},
+    rallies: List<Rally> = emptyList(),
+    selectedRally: Rally? = null,
+    smartSkip: Boolean = false,
+    loopRally: Boolean = false,
     modifier: Modifier = Modifier,
     fillHeight: Boolean = false,
 ) {
@@ -134,7 +139,7 @@ fun LocalVideoPlayer(
         }
     }
 
-    LaunchedEffect(player) {
+    LaunchedEffect(player, rallies, selectedRally, smartSkip, loopRally) {
         while (true) {
             if (player.playbackState == Player.STATE_READY || player.isPlaying) {
                 val sec = player.currentPosition / 1000.0
@@ -143,9 +148,29 @@ fun LocalVideoPlayer(
                     sliderValue = sec.toFloat()
                     onPlayheadChange(sec)
                 }
-                if (player.isPlaying && sec >= playUntilSec - 0.04) {
-                    player.pause()
-                    playUntilSec = Double.POSITIVE_INFINITY
+
+                if (player.isPlaying) {
+                    if (loopRally && selectedRally != null) {
+                        if (sec >= selectedRally.endSec - 0.04) {
+                            player.seekTo((selectedRally.startSec * 1000).toLong())
+                        }
+                    } else if (smartSkip && rallies.isNotEmpty()) {
+                        val sorted = rallies.sortedBy { it.startSec }
+                        val inside = sorted.find { sec >= it.startSec - 0.05 && sec <= it.endSec - 0.04 }
+                        if (inside == null) {
+                            val next = sorted.find { it.startSec > sec }
+                            if (next != null) {
+                                player.seekTo((next.startSec * 1000).toLong())
+                            } else if (sec > sorted.last().endSec) {
+                                player.pause()
+                            }
+                        }
+                    }
+
+                    if (sec >= playUntilSec - 0.04) {
+                        player.pause()
+                        playUntilSec = Double.POSITIVE_INFINITY
+                    }
                 }
             }
             kotlinx.coroutines.delay(80)

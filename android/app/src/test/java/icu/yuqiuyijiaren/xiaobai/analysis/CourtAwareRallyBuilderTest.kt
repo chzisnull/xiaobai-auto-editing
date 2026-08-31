@@ -57,8 +57,8 @@ class CourtAwareRallyBuilderTest {
     }
 
     @Test
-    fun walkMotionStartPullsServeLeadBeforeFirstHit() {
-        // Elevated motion begins ~1.2s before first supported hit
+    fun strictModeDoesNotWalkStartBackThroughDeadTime() {
+        // Elevated motion begins ~1.2s before first supported hit (walking onto court)
         val hits = doubleArrayOf(10.0, 10.7, 11.4, 12.1, 12.8)
         val motionT = DoubleArray(80) { it * 0.2 }
         val motionE = DoubleArray(80) { idx ->
@@ -70,8 +70,9 @@ class CourtAwareRallyBuilderTest {
         }
         val rallies = builder.build(hits, MotionSeries(motionT, motionE))
         assertTrue(rallies.isNotEmpty())
-        // Should start before first hit (serve walk-back), not only firstHit - 0.85
-        assertTrue(rallies[0].start < 9.5)
+        // Strict keeps ~1.1s serve lead, not 1.5s+ of walking onto court.
+        assertTrue(rallies[0].start >= 8.6)
+        assertTrue(rallies[0].start <= 10.0)
         assertTrue(rallies[0].end > 12.8)
     }
 

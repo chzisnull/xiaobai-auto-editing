@@ -46,9 +46,19 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
             val audioHits = AudioHitDetector(
                 maxOutputSamples = config.maxAudioMinutes * 60 * 16_000,
                 softProminence = config.softProminence,
+                hitMadK = config.hitMadK,
             )
             val builder = CourtAwareRallyBuilder(visualFps = motionFps)
-            val highlightFilter = StrictHighlightFilter()
+            val highlightFilter = StrictHighlightFilter(
+                servePad = 1.15,
+                landPad = 0.85,
+                maxHitSilence = 2.45,
+                motionBridgeSilence = 3.3,
+                minHits = 3,
+                minDuration = 1.6,
+                minHitDensity = 0.32,
+                remergeGap = 1.15,
+            )
 
             emit(progress(AnalysisPhase.ExtractingAudio, 0.08f, "解码音轨并检测击球（${config.tier.label}）"))
             val hitResult = try {

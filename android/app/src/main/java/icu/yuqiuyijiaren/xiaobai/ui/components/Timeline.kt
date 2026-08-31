@@ -146,18 +146,19 @@ fun ZoomableRallyTimeline(
                     detectDragGestures(
                         onDragStart = { offset ->
                             onGestureStart()
-                            val selected = selectedIndex?.takeIf { it in rallies.indices }?.let { rallies[it] }
-                            dragMode = if (selected != null) {
+                            val idx = selectedIndex?.takeIf { it in rallies.indices }
+                            val selected = idx?.let { rallies[it] }
+                            dragMode = if (selected != null && idx != null) {
                                 val startX = timeToX(selected.startSec, size.width.toFloat())
                                 val endX = timeToX(selected.endSec, size.width.toFloat())
                                 when {
                                     abs(offset.x - startX) <= handlePx ->
-                                        DragMode.TrimStart(selectedIndex!!)
+                                        DragMode.TrimStart(idx)
                                     abs(offset.x - endX) <= handlePx ->
-                                        DragMode.TrimEnd(selectedIndex!!)
+                                        DragMode.TrimEnd(idx)
                                     offset.x in startX..endX ->
                                         DragMode.MoveBody(
-                                            index = selectedIndex!!,
+                                            index = idx,
                                             grabTime = xToTime(offset.x, size.width.toFloat()),
                                             originStart = selected.startSec,
                                             originEnd = selected.endSec,

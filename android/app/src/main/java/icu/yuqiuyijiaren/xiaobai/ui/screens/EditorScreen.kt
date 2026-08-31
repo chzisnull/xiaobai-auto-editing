@@ -279,7 +279,7 @@ private fun PortraitBody(
             (state.analysis.message.isNotBlank() &&
                 state.analysis.phase != icu.yuqiuyijiaren.xiaobai.domain.AnalysisPhase.Idle)
         ) {
-            item { AnalysisCard(state, viewModel) }
+            item { AnalysisCard(state) }
         }
         item {
             RallyInspector(
@@ -306,7 +306,16 @@ private fun PortraitBody(
                     state.selectedRallyIndex?.let { viewModel.onEvent(EditorEvent.DeleteRally(it)) }
                 },
                 canMergeNext = state.selectedRallyIndex != null &&
-                    (state.selectedRallyIndex ?: 0) < state.rallies.lastIndex,
+                    state.selectedRallyIndex < state.rallies.lastIndex,
+                onSetReviewStatus = { status ->
+                    state.selectedRallyIndex?.let { i ->
+                        viewModel.onEvent(EditorEvent.SetRallyStatus(i, status))
+                    }
+                },
+                smartSkip = state.smartSkip,
+                onToggleSmartSkip = { viewModel.onEvent(EditorEvent.ToggleSmartSkip) },
+                loopRally = state.loopRally,
+                onToggleLoop = { viewModel.onEvent(EditorEvent.ToggleLoopRally) },
             )
         }
         item { RallyListHeader(state, viewModel) }
@@ -349,7 +358,7 @@ private fun LandscapeBody(
                 (state.analysis.message.isNotBlank() &&
                     state.analysis.phase != icu.yuqiuyijiaren.xiaobai.domain.AnalysisPhase.Idle)
             ) {
-                AnalysisCard(state, viewModel)
+                AnalysisCard(state)
             }
             RallyInspector(
                 rally = state.selectedRally,
@@ -375,7 +384,16 @@ private fun LandscapeBody(
                     state.selectedRallyIndex?.let { viewModel.onEvent(EditorEvent.DeleteRally(it)) }
                 },
                 canMergeNext = state.selectedRallyIndex != null &&
-                    (state.selectedRallyIndex ?: 0) < state.rallies.lastIndex,
+                    state.selectedRallyIndex < state.rallies.lastIndex,
+                onSetReviewStatus = { status ->
+                    state.selectedRallyIndex?.let { i ->
+                        viewModel.onEvent(EditorEvent.SetRallyStatus(i, status))
+                    }
+                },
+                smartSkip = state.smartSkip,
+                onToggleSmartSkip = { viewModel.onEvent(EditorEvent.ToggleSmartSkip) },
+                loopRally = state.loopRally,
+                onToggleLoop = { viewModel.onEvent(EditorEvent.ToggleLoopRally) },
             )
         }
         Column(
@@ -487,6 +505,10 @@ private fun VideoCard(state: EditorUiState, viewModel: EditorViewModel, fillHeig
                         onPlayheadChange = viewModel::updatePlayhead,
                         playback = state.playback,
                         onPlaybackConsumed = { viewModel.onEvent(EditorEvent.ClearPlaybackCommand) },
+                        rallies = state.rallies,
+                        selectedRally = state.selectedRally,
+                        smartSkip = state.smartSkip,
+                        loopRally = state.loopRally,
                         fillHeight = fillHeight,
                         modifier = if (fillHeight) Modifier.fillMaxSize() else Modifier,
                     )
@@ -500,18 +522,21 @@ private fun VideoCard(state: EditorUiState, viewModel: EditorViewModel, fillHeig
                     }
                 }
                 Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "${state.source!!.displayName} · ${formatClock(state.source!!.durationSec)}",
-                    color = Muted,
-                    fontSize = 12.sp,
-                )
+                val source = state.source
+                if (source != null) {
+                    Text(
+                        text = "${source.displayName} · ${formatClock(source.durationSec)}",
+                        color = Muted,
+                        fontSize = 12.sp,
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun AnalysisCard(state: EditorUiState, viewModel: EditorViewModel) {
+private fun AnalysisCard(state: EditorUiState) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Color(0x14007AFF)),
         shape = RoundedCornerShape(12.dp),
@@ -554,11 +579,20 @@ private fun RallyListHeader(state: EditorUiState, viewModel: EditorViewModel) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text("回合列表 · ${state.rallies.size}", fontWeight = FontWeight.SemiBold, color = Ink)
-        IconButton(
-            onClick = { viewModel.onEvent(EditorEvent.AddRallyAt(state.playheadSec)) },
-            enabled = state.source != null,
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "在播头添加", tint = Blue)
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            if (state.rallies.size >= 2) {
+                androidx.compose.material3.TextButton(
+                    onClick = { viewModel.onEvent(EditorEvent.MergeAdjacentRallies) },
+                ) {
+                    Text("合并碎片", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+            IconButton(
+                onClick = { viewModel.onEvent(EditorEvent.AddRallyAt(state.playheadSec)) },
+                enabled = state.source != null,
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "在播头添加", tint = Blue)
+            }
         }
     }
 }
@@ -570,6 +604,12 @@ private fun RallyListItem(
     selected: Boolean,
     viewModel: EditorViewModel,
 ) {
+    val statusColor = when (rally.reviewStatus) {
+        icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Approved -> icu.yuqiuyijiaren.xiaobai.ui.theme.Green
+        icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Flagged -> Amber
+        icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Rejected -> Color(0xFFFF3B30)
+        icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Normal -> if (rally.confidence < 0.72) Amber else Blue
+    }
     Card(
         onClick = { viewModel.onEvent(EditorEvent.SelectRally(index)) },
         colors = CardDefaults.cardColors(
@@ -587,19 +627,35 @@ private fun RallyListItem(
                 modifier = Modifier
                     .size(10.dp)
                     .clip(CircleShape)
-                    .background(if (rally.confidence < 0.72) Amber else Blue),
+                    .background(statusColor),
             )
             Spacer(Modifier.width(10.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "%02d  %s - %s".format(
-                        index + 1,
-                        formatClock(rally.startSec),
-                        formatClock(rally.endSec),
-                    ),
-                    color = Ink,
-                    fontWeight = FontWeight.Medium,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        "%02d  %s - %s".format(
+                            index + 1,
+                            formatClock(rally.startSec),
+                            formatClock(rally.endSec),
+                        ),
+                        color = Ink,
+                        fontWeight = FontWeight.Medium,
+                    )
+                    if (rally.reviewStatus != icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Normal) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            when (rally.reviewStatus) {
+                                icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Approved -> "已过"
+                                icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Flagged -> "待查"
+                                icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Rejected -> "弃用"
+                                else -> ""
+                            },
+                            color = statusColor,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                }
                 Text(
                     "%.1fs · 置信度 %d%%".format(
                         rally.durationSec,

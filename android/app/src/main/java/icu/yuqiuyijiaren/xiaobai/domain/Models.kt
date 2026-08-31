@@ -4,11 +4,19 @@ package icu.yuqiuyijiaren.xiaobai.domain
  * Shared domain models aligned with desktop/web rally JSON shape.
  * Keep this package free of Android UI so future ONNX/native code can reuse it.
  */
+enum class ReviewStatus {
+    Normal,
+    Approved,
+    Flagged,
+    Rejected,
+}
+
 data class Rally(
     val id: Long,
     val startSec: Double,
     val endSec: Double,
     val confidence: Double = 1.0,
+    val reviewStatus: ReviewStatus = ReviewStatus.Normal,
 ) {
     val durationSec: Double get() = (endSec - startSec).coerceAtLeast(0.0)
 
@@ -112,6 +120,10 @@ sealed interface EditorEvent {
     data class UpdateCourtRoiPoint(val index: Int, val x: Float, val y: Float) : EditorEvent
     data object ResetCourtRoi : EditorEvent
     data class SetAnalysisTier(val tier: AnalysisTier) : EditorEvent
+    data class SetRallyStatus(val index: Int, val status: ReviewStatus) : EditorEvent
+    data object MergeAdjacentRallies : EditorEvent
+    data object ToggleSmartSkip : EditorEvent
+    data object ToggleLoopRally : EditorEvent
     data object Export : EditorEvent
     data object ClearError : EditorEvent
     data object ClearExportPath : EditorEvent
@@ -139,6 +151,8 @@ data class EditorUiState(
     val rangeMarkOutSec: Double? = null,
     val canUndo: Boolean = false,
     val playback: PlaybackCommand? = null,
+    val smartSkip: Boolean = false,
+    val loopRally: Boolean = false,
     val deviceSummary: String = "",
     val deviceCapabilityLine: String = "",
     val analysisTier: AnalysisTier = AnalysisTier.Standard,

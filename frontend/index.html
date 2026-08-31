@@ -156,6 +156,12 @@
     .button-quiet:hover { color: var(--ink); background: var(--surface-soft); }
     .button-icon { width: 44px; height: 44px; min-height: 44px; padding: 0; }
     .button-danger:hover { color: var(--danger); background: rgba(255, 59, 48, 0.09); }
+    .button-toggle.active {
+      color: #fff !important;
+      background: var(--blue) !important;
+      box-shadow: 0 2px 8px rgba(0, 122, 255, 0.35);
+    }
+    .button-toggle.active svg { color: #fff !important; }
 
     .video-stage {
       position: relative;
@@ -734,10 +740,25 @@
             <p id="timelineSubtitle">支持缩放、左右滑动、拖拽调整起止时间</p>
           </div>
           <div class="timeline-actions">
-            <button class="button button-quiet button-icon" id="splitRallyButton" title="在播放头处拆分选中回合" aria-label="拆分回合" disabled>
+            <button class="button button-quiet button-icon button-toggle" id="smartSkipButton" title="跳过死球模式 (快捷键 X): 连续播放有效回合" aria-label="跳过死球模式">
+              <i data-lucide="fast-forward"></i>
+            </button>
+            <button class="button button-quiet button-icon button-toggle" id="loopRallyButton" title="单回合循环播放 (快捷键 L)" aria-label="单回合循环" disabled>
+              <i data-lucide="repeat"></i>
+            </button>
+            <button class="button button-quiet button-icon" id="setStartButton" title="将当前播放位置设为选中回合起点 (快捷键 [)" aria-label="设为起点" disabled>
+              <i data-lucide="step-back"></i>
+            </button>
+            <button class="button button-quiet button-icon" id="setEndButton" title="将当前播放位置设为选中回合终点 (快捷键 ])" aria-label="设为终点" disabled>
+              <i data-lucide="step-forward"></i>
+            </button>
+            <button class="button button-quiet button-icon" id="mergeAdjacentButton" title="合并相邻碎片回合 (<1.0s)" aria-label="合并相邻回合" disabled>
+              <i data-lucide="git-merge"></i>
+            </button>
+            <button class="button button-quiet button-icon" id="splitRallyButton" title="在播放头处拆分选中回合 (快捷键 S)" aria-label="拆分回合" disabled>
               <i data-lucide="scissors"></i>
             </button>
-            <button class="button button-quiet button-icon" id="deleteSelectedButton" title="删除选中回合" aria-label="删除选中回合" disabled>
+            <button class="button button-quiet button-icon" id="deleteSelectedButton" title="删除选中回合 (快捷键 Delete)" aria-label="删除选中回合" disabled>
               <i data-lucide="trash-2"></i>
             </button>
             <button class="button button-quiet button-icon" id="addRallyButton" title="在当前播放位置添加回合" aria-label="添加回合" disabled>
@@ -893,6 +914,8 @@
       drag: null,
       exportObjectUrl: null,
       rallyPlaybackEnd: null,
+      smartSkip: false,
+      loopRally: false,
       courtRoi: DEFAULT_COURT_ROI.map(point => ({ ...point })),
       courtDragIndex: null,
       statusBeforeCalibration: 'idle',
@@ -938,6 +961,11 @@
       zoomOutButton: document.getElementById('zoomOutButton'),
       zoomFitButton: document.getElementById('zoomFitButton'),
       scrollToPlayheadButton: document.getElementById('scrollToPlayheadButton'),
+      smartSkipButton: document.getElementById('smartSkipButton'),
+      loopRallyButton: document.getElementById('loopRallyButton'),
+      setStartButton: document.getElementById('setStartButton'),
+      setEndButton: document.getElementById('setEndButton'),
+      mergeAdjacentButton: document.getElementById('mergeAdjacentButton'),
       splitRallyButton: document.getElementById('splitRallyButton'),
       deleteSelectedButton: document.getElementById('deleteSelectedButton'),
       originalDuration: document.getElementById('originalDuration'),
@@ -1504,11 +1532,85 @@
       showToast('已在播放头处拆分回合');
     }
 
+    function setSelectedStartAtPlayhead() {
+      const index = state.selectedRallyIndex;
+      if (index == null || !state.rallies[index] || !state.duration) return;
+      const rally = state.rallies[index];
+      const t = elements.videoPlayer.currentTime;
+      if (t >= rally.end - 0.2) {
+        showToast('起点不能大于或过于接近终点', 'error');
+        return;
+      }
+      rally.start = Math.max(0, Number(t.toFixed(2)));
+      renderAll();
+      showToast(`已将回合起点设为 ${formatTime(t, true)}`);
+    }
+
+    function setSelectedEndAtPlayhead() {
+      const index = state.selectedRallyIndex;
+      if (index == null || !state.rallies[index] || !state.duration) return;
+      const rally = state.rallies[index];
+      const t = elements.videoPlayer.currentTime;
+      if (t <= rally.start + 0.2) {
+        showToast('终点不能小于或过于接近起点', 'error');
+        return;
+      }
+      rally.end = Math.min(state.duration, Number(t.toFixed(2)));
+      renderAll();
+      showToast(`已将回合终点设为 ${formatTime(t, true)}`);
+    }
+
+    function mergeAdjacentRallies() {
+      if (state.rallies.length < 2) return;
+      const sorted = [...state.rallies].sort((a, b) => a.start - b.start);
+      const merged = [sorted[0]];
+      let count = 0;
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = merged[merged.length - 1];
+        const curr = sorted[i];
+        if (curr.start - prev.end <= 1.0) {
+          prev.end = Math.max(prev.end, curr.end);
+          prev.confidence = Math.min(prev.confidence ?? 1, curr.confidence ?? 1);
+          count++;
+        } else {
+          merged.push(curr);
+        }
+      }
+      state.rallies = merged;
+      state.selectedRallyIndex = null;
+      renderAll();
+      showToast(count > 0 ? `已自动合并 ${count} 处相邻碎片回合` : '未发现间隔小于 1.0s 的相邻碎片回合');
+    }
+
+    function toggleSmartSkip() {
+      state.smartSkip = !state.smartSkip;
+      if (elements.smartSkipButton) {
+        elements.smartSkipButton.classList.toggle('active', state.smartSkip);
+      }
+      showToast(state.smartSkip ? '已开启跳过死球模式 (连续播放有效回合)' : '已关闭跳过死球模式');
+    }
+
+    function toggleLoopRally() {
+      if (state.selectedRallyIndex == null) {
+        showToast('请先在时间轴上选择一个回合', 'error');
+        return;
+      }
+      state.loopRally = !state.loopRally;
+      if (elements.loopRallyButton) {
+        elements.loopRallyButton.classList.toggle('active', state.loopRally);
+      }
+      showToast(state.loopRally ? '已开启单回合循环播放' : '已关闭单回合循环');
+    }
+
     function deleteSelectedRally() {
       const index = state.selectedRallyIndex;
       if (index == null || !state.rallies[index]) return;
       state.rallies.splice(index, 1);
       state.selectedRallyIndex = null;
+      if (state.loopRally) {
+        state.loopRally = false;
+        elements.loopRallyButton?.classList.remove('active');
+      }
       renderAll();
     }
 
@@ -1608,6 +1710,17 @@
       const hasSelection = state.selectedRallyIndex != null && Boolean(state.rallies[state.selectedRallyIndex]);
       if (elements.splitRallyButton) elements.splitRallyButton.disabled = !hasSelection || !state.duration;
       if (elements.deleteSelectedButton) elements.deleteSelectedButton.disabled = !hasSelection;
+      if (elements.smartSkipButton) {
+        elements.smartSkipButton.disabled = !state.rallies.length;
+        elements.smartSkipButton.classList.toggle('active', state.smartSkip);
+      }
+      if (elements.loopRallyButton) {
+        elements.loopRallyButton.disabled = !hasSelection;
+        elements.loopRallyButton.classList.toggle('active', state.loopRally);
+      }
+      if (elements.setStartButton) elements.setStartButton.disabled = !hasSelection || !state.duration;
+      if (elements.setEndButton) elements.setEndButton.disabled = !hasSelection || !state.duration;
+      if (elements.mergeAdjacentButton) elements.mergeAdjacentButton.disabled = state.rallies.length < 2;
       if (elements.zoomInButton) elements.zoomInButton.disabled = !state.duration || state.timelineZoom >= TIMELINE_MAX_ZOOM;
       if (elements.zoomOutButton) elements.zoomOutButton.disabled = !state.duration || state.timelineZoom <= TIMELINE_MIN_ZOOM;
       if (elements.zoomFitButton) elements.zoomFitButton.disabled = !state.duration;
@@ -1685,6 +1798,11 @@
 
     elements.videoInput.addEventListener('change', event => handleFile(event.target.files[0]));
     elements.addRallyButton.addEventListener('click', addRally);
+    elements.smartSkipButton?.addEventListener('click', toggleSmartSkip);
+    elements.loopRallyButton?.addEventListener('click', toggleLoopRally);
+    elements.setStartButton?.addEventListener('click', setSelectedStartAtPlayhead);
+    elements.setEndButton?.addEventListener('click', setSelectedEndAtPlayhead);
+    elements.mergeAdjacentButton?.addEventListener('click', mergeAdjacentRallies);
     elements.splitRallyButton?.addEventListener('click', splitSelectedRallyAtPlayhead);
     elements.deleteSelectedButton?.addEventListener('click', deleteSelectedRally);
     elements.zoomInButton?.addEventListener('click', () => setTimelineZoom(state.timelineZoom * 1.35));
@@ -1749,7 +1867,28 @@
     });
     elements.videoPlayer.addEventListener('timeupdate', () => {
       updatePlayhead();
-      if (state.rallyPlaybackEnd !== null && elements.videoPlayer.currentTime >= state.rallyPlaybackEnd - 0.03) {
+      const cur = elements.videoPlayer.currentTime;
+      if (state.loopRally && state.selectedRallyIndex !== null && state.rallies[state.selectedRallyIndex]) {
+        const rally = state.rallies[state.selectedRallyIndex];
+        if (cur >= rally.end - 0.04) {
+          elements.videoPlayer.currentTime = rally.start;
+          return;
+        }
+      }
+      if (state.smartSkip && state.rallies.length > 0 && !elements.videoPlayer.paused) {
+        const sorted = [...state.rallies].sort((a, b) => a.start - b.start);
+        const inside = sorted.find(r => cur >= r.start - 0.05 && cur <= r.end - 0.04);
+        if (!inside) {
+          const next = sorted.find(r => r.start > cur);
+          if (next) {
+            elements.videoPlayer.currentTime = next.start;
+          } else if (cur > sorted[sorted.length - 1].end) {
+            elements.videoPlayer.pause();
+            elements.videoPlayer.currentTime = sorted[sorted.length - 1].end;
+          }
+        }
+      }
+      if (state.rallyPlaybackEnd !== null && cur >= state.rallyPlaybackEnd - 0.03) {
         const rallyEnd = state.rallyPlaybackEnd;
         state.rallyPlaybackEnd = null;
         elements.videoPlayer.pause();
@@ -1781,7 +1920,44 @@
     document.addEventListener('keydown', event => {
       const tag = (event.target && event.target.tagName) || '';
       if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-      if ((event.key === '+' || event.key === '=') && state.duration) {
+      if (event.key === ' ' || event.code === 'Space') {
+        event.preventDefault();
+        if (elements.videoPlayer.paused) elements.videoPlayer.play();
+        else elements.videoPlayer.pause();
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        const delta = event.shiftKey ? 1.0 : (event.altKey ? 5.0 : 0.2);
+        elements.videoPlayer.currentTime = Math.max(0, (elements.videoPlayer.currentTime || 0) - delta);
+        updatePlayhead();
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        const delta = event.shiftKey ? 1.0 : (event.altKey ? 5.0 : 0.2);
+        elements.videoPlayer.currentTime = Math.min(state.duration || 99999, (elements.videoPlayer.currentTime || 0) + delta);
+        updatePlayhead();
+      } else if (event.key === '[' && state.selectedRallyIndex != null) {
+        event.preventDefault();
+        setSelectedStartAtPlayhead();
+      } else if (event.key === ']' && state.selectedRallyIndex != null) {
+        event.preventDefault();
+        setSelectedEndAtPlayhead();
+      } else if ((event.key === 'x' || event.key === 'X') && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        toggleSmartSkip();
+      } else if ((event.key === 'l' || event.key === 'L') && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        toggleLoopRally();
+      } else if ((event.key === 'm' || event.key === 'M') && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        mergeAdjacentRallies();
+      } else if ((event.key === 'j' || event.key === 'J') && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        elements.videoPlayer.currentTime = Math.max(0, (elements.videoPlayer.currentTime || 0) - 1.0);
+        updatePlayhead();
+      } else if ((event.key === 'k' || event.key === 'K') && !event.metaKey && !event.ctrlKey) {
+        event.preventDefault();
+        if (elements.videoPlayer.paused) elements.videoPlayer.play();
+        else elements.videoPlayer.pause();
+      } else if ((event.key === '+' || event.key === '=') && state.duration) {
         event.preventDefault();
         setTimelineZoom(state.timelineZoom * 1.25);
         renderControls();

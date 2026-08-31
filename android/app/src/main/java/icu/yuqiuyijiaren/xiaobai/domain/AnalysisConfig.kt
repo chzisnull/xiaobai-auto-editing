@@ -44,6 +44,8 @@ data class AnalysisConfig(
     val doubleHighlightPass: Boolean,
     val softProminence: Float,
     val applyMotionBlur: Boolean,
+    /** Audio hit MAD k. Higher rejects adjacent-court / shoe noise. */
+    val hitMadK: Float,
 ) {
     val summary: String
         get() = "${tier.label} · 运动≤${visualFps}fps · 最多${motionMaxSamples}点 · 音轨≤${maxAudioMinutes}分钟"
@@ -90,6 +92,7 @@ data class AnalysisConfig(
                     doubleHighlightPass = false,
                     softProminence = 1.06f,
                     applyMotionBlur = false,
+                    hitMadK = 6.2f,
                 )
                 AnalysisTier.Standard -> AnalysisConfig(
                     tier = effective,
@@ -99,8 +102,9 @@ data class AnalysisConfig(
                     maxAudioMinutes = if (device.totalRamMb >= 4096) 25 else 18,
                     motionMaxSamples = 1200,
                     doubleHighlightPass = true,
-                    softProminence = 1.04f,
+                    softProminence = 1.05f,
                     applyMotionBlur = false,
+                    hitMadK = 6.6f,
                 )
                 AnalysisTier.Precise -> AnalysisConfig(
                     tier = effective,
@@ -110,8 +114,9 @@ data class AnalysisConfig(
                     maxAudioMinutes = if (device.totalRamMb >= 6144) 30 else 22,
                     motionMaxSamples = 1800,
                     doubleHighlightPass = true,
-                    softProminence = 1.03f,
+                    softProminence = 1.04f,
                     applyMotionBlur = true,
+                    hitMadK = 6.6f,
                 )
             }
         }
