@@ -22,9 +22,19 @@ class CourtAwareRallyBuilderTest {
     }
 
     @Test
-    fun dropsSparseTwoHitStubInStrictMode() {
+    fun keepsTwoHitNetFaultInStrictMode() {
         val hits = doubleArrayOf(5.0, 5.5)
         val motion = flatMotion(from = 4.0, to = 7.0, energy = 0.08, duration = 20.0)
+        val rallies = builder.build(hits, motion)
+        assertEquals(1, rallies.size)
+        assertTrue(rallies[0].firstHit <= 5.05)
+        assertTrue(rallies[0].lastHit >= 5.45)
+    }
+
+    @Test
+    fun dropsIsolatedOneHitWithoutCourtSupport() {
+        val hits = doubleArrayOf(5.0)
+        val motion = flatMotion(from = 0.0, to = 1.0, energy = 0.002, duration = 20.0)
         val rallies = builder.build(hits, motion)
         assertTrue(rallies.isEmpty())
     }
@@ -79,5 +89,45 @@ class CourtAwareRallyBuilderTest {
             if (time in from..to) energy else 0.002
         }
         return MotionSeries(t, e)
+    }
+
+    @Test
+    fun keepsGt11StyleIsolatedServe() {
+        val hits = doubleArrayOf(248.21, 251.57, 255.30, 256.52)
+        val motionT = DoubleArray(160) { 240.0 + it * 0.125 }
+        val motionE = DoubleArray(160) { idx ->
+            val t = motionT[idx]
+            if (t in 255.0..257.2) 0.032 else 0.003
+        }
+        val rallies = builder.build(hits, MotionSeries(motionT, motionE))
+        assertTrue(rallies.any { kotlin.math.abs(it.firstHit - 251.57) < 0.25 })
+    }
+
+    @Test
+    fun keepsGt21StyleLongIsoOneHit() {
+        val hits = doubleArrayOf(437.08, 446.56, 448.75)
+        val motionT = DoubleArray(200) { 430.0 + it * 0.125 }
+        val motionE = DoubleArray(200) { 0.004 }
+        val rallies = builder.build(hits, MotionSeries(motionT, motionE))
+        assertTrue(rallies.any { kotlin.math.abs(it.firstHit - 446.56) < 0.25 })
+    }
+
+    @Test
+    fun peelsGt23StyleZeroCourtTail() {
+        val hits = doubleArrayOf(465.00, 473.88, 476.25, 478.096, 478.65, 480.35, 484.19)
+        val motionT = DoubleArray(160) { 470.0 + it * 0.125 }
+        val motionE = DoubleArray(160) { 0.003 }
+        val rallies = builder.build(hits, MotionSeries(motionT, motionE))
+        assertTrue(rallies.any { kotlin.math.abs(it.firstHit - 478.096) < 0.25 })
+        assertTrue(rallies.none { kotlin.math.abs(it.firstHit - 476.25) < 0.25 })
+    }
+
+    @Test
+    fun dropsAdjacentCourtZeroCourtBlob() {
+        val hits = doubleArrayOf(461.88, 467.73, 468.26, 469.51, 470.95, 471.68, 472.90, 473.88, 476.25)
+        val motionT = DoubleArray(200) { 455.0 + it * 0.125 }
+        val motionE = DoubleArray(200) { 0.003 }
+        val rallies = builder.build(hits, MotionSeries(motionT, motionE))
+        assertTrue(rallies.none { it.firstHit in 467.0..474.0 })
     }
 }

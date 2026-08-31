@@ -117,10 +117,46 @@ class AudioVisualRallyDetector(BaseRallyDetector):
         return raw_rallies
 
     def _extract_audio(self, video_path: str) -> Tuple[np.ndarray, int]:
-        """Extract PCM mono audio waveform at target sample rate."""
-        import librosa
-        audio, sr = librosa.load(video_path, sr=self.sample_rate, mono=True)
-        return audio, sr
+        """Extract PCM mono audio waveform at target sample rate.
+
+        librosa 1.0+ loads via soundfile only, which cannot decode mp4/webm
+        containers. Fall back to ffmpeg PCM decode so hit detection still runs.
+        """
+        try:
+            import librosa
+            audio, sr = librosa.load(video_path, sr=self.sample_rate, mono=True)
+            return audio, sr
+        except Exception as exc:
+            logger.warning(
+                "librosa.load failed for %s (%s); decoding audio via ffmpeg",
+                video_path,
+                exc,
+            )
+            return self._extract_audio_ffmpeg(video_path)
+
+    def _extract_audio_ffmpeg(self, video_path: str) -> Tuple[np.ndarray, int]:
+        """Decode mono PCM through ffmpeg (works for mp4/webm/aac/opus)."""
+        import subprocess
+
+        cmd = [
+            "ffmpeg",
+            "-v", "error",
+            "-nostdin",
+            "-i", video_path,
+            "-f", "s16le",
+            "-acodec", "pcm_s16le",
+            "-ac", "1",
+            "-ar", str(self.sample_rate),
+            "pipe:1",
+        ]
+        proc = subprocess.run(cmd, capture_output=True, check=False)
+        if proc.returncode != 0 or not proc.stdout:
+            err = proc.stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(
+                f"ffmpeg audio decode failed for {video_path}: {err or proc.returncode}"
+            )
+        audio = np.frombuffer(proc.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+        return audio, self.sample_rate
 
     def _extract_visual_motion(self, video_path: str) -> Tuple[np.ndarray, np.ndarray]:
         """Extract frame difference motion energy downsampled to visual_fps at 320x240."""
@@ -178,6 +214,8 @@ class AudioVisualRallyDetector(BaseRallyDetector):
         and find_peaks with dynamic noise thresholding.
         """
         if len(audio) < sr * 0.1:  # extremely short audio segment
+            self._last_hit_heights = np.array([])
+            self._last_hit_height_threshold = 0.0
             return np.array([])
 
         sos = self._design_bandpass_filter(sr)
@@ -202,13 +240,16 @@ class AudioVisualRallyDetector(BaseRallyDetector):
         distance_samples = max(1, int(self.min_hit_interval * sr))
 
         # Peak detection
-        peaks, _ = signal.find_peaks(
+        peaks, props = signal.find_peaks(
             smoothed_envelope,
             height=height_threshold if height_threshold > 0 else None,
             distance=distance_samples
         )
 
         hit_timestamps = peaks / float(sr)
+        # Side channel for court-aware grouping (strong vs weak hits).
+        self._last_hit_heights = np.asarray(props.get("peak_heights", []), dtype=float)
+        self._last_hit_height_threshold = float(height_threshold)
         return hit_timestamps
 
     def _run_rally_fsm(

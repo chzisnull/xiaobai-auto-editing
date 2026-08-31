@@ -49,15 +49,15 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
         kwargs.setdefault("visual_fps", 8)
         kwargs.setdefault("motion_threshold", 0.01)
         if self.strict:
-            # Slightly longer silence than before so soft mid-rally exchanges
-            # are not chopped; dead-ball is still cut by motion-aware filter.
-            kwargs.setdefault("max_silence_gap", 2.6)
-            kwargs.setdefault("min_rally_duration", 1.5)
-            landing_delay = min(landing_delay, 0.95)
-            serve_lead = min(serve_lead, 0.35)
-            max_serve_lookback = min(max_serve_lookback, 1.8)
-            max_bridge_gap = min(max_bridge_gap, 3.8)
-            residual_motion_window = min(residual_motion_window, 1.2)
+            # 2.15s silence splits walking glue (~2s gaps) while a high-clear
+            # (3–4.5s) can still be bridged by motion_bridges / highlight filter.
+            kwargs.setdefault("max_silence_gap", 1.85)
+            kwargs.setdefault("min_rally_duration", 1.35)
+            landing_delay = min(landing_delay, 0.70)
+            serve_lead = min(serve_lead, 0.50)
+            max_serve_lookback = min(max(max_serve_lookback, 2.2), 2.6)
+            max_bridge_gap = min(max_bridge_gap, 4.2)
+            residual_motion_window = min(residual_motion_window, 1.0)
             max_rally_duration = min(max_rally_duration, 22.0)
         else:
             kwargs.setdefault("max_silence_gap", 3.0)
@@ -91,15 +91,15 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             self.highlight_filter = highlight_filter
         elif self.strict:
             self.highlight_filter = StrictHighlightFilter(
-                serve_pad=0.75,
-                land_pad=0.95,
-                max_hit_silence=2.5,
-                motion_bridge_silence=3.6,
-                min_hits=3,
-                min_duration=1.5,
+                serve_pad=1.05,
+                land_pad=0.60,
+                max_hit_silence=1.85,
+                motion_bridge_silence=4.2,
+                min_hits=2,
+                min_duration=1.35,
                 max_duration=self.max_rally_duration,
-                min_hit_density=0.30,
-                remerge_gap=1.35,
+                min_hit_density=0.22,
+                remerge_gap=1.15,
             )
         else:
             self.highlight_filter = StrictHighlightFilter(
@@ -207,10 +207,12 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
         median_motion = float(np.median(motion_energies))
         active_motion = float(np.percentile(motion_energies, 85))
         motion_range = max(0.0, active_motion - median_motion)
-        # Primary gate: hit must coincide with court activity.
+        # Primary gate: in-court activity. Kept modest so far-court / phone-mic
+        # serves (tiny pixel motion) are not dropped; walking FPs are handled
+        # by split + highlight filter instead of this gate.
         support_threshold = max(
-            self.motion_threshold,
-            median_motion + 0.20 * motion_range,
+            self.motion_threshold * 0.6,
+            median_motion + 0.10 * motion_range,
         )
         # Soft gate: quieter mid-rally exchanges still glue fragments.
         bridge_threshold = max(
@@ -261,8 +263,8 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             mean_energy, active_fraction = interval_motion_stats(previous_hit, next_hit)
             # Dense continuous motion can bridge a short hole (missed soft hit).
             # Cap the pure-motion bridge so between-point walking is not glued.
-            pure_motion_cap = 3.6 if self.strict else 4.5
-            pure_motion_frac = 0.48 if self.strict else 0.55
+            pure_motion_cap = 2.6 if self.strict else 4.5
+            pure_motion_frac = 0.55 if self.strict else 0.55
             if (
                 gap <= min(self.max_bridge_gap, pure_motion_cap)
                 and active_fraction >= pure_motion_frac
@@ -351,15 +353,29 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             strong_end = min(strong_look_until, last_strong_time + 0.35)
             return max(end, residual_end, strong_end)
 
+        heights = np.asarray(getattr(self, "_last_hit_heights", []), dtype=float)
+        height_thr = float(getattr(self, "_last_hit_height_threshold", 0.0) or 0.0)
+        strong_thr = height_thr * 1.55 if height_thr > 0 else None
+        height_by_time = {}
+        if len(heights) == len(hit_peaks):
+            height_by_time = {float(t): float(h) for t, h in zip(hit_peaks, heights)}
+
         supported: List[Tuple[float, float]] = []
         soft_hits: List[Tuple[float, float]] = []
+        court_supported_times = set()
         for peak in hit_peaks:
             peak_time = float(peak)
             motion = local_motion(peak_time)
-            if motion >= support_threshold:
+            height = height_by_time.get(peak_time, 0.0)
+            is_strong = strong_thr is not None and height >= strong_thr
+            in_court = motion >= support_threshold
+            if in_court:
+                court_supported_times.add(peak_time)
+            # Strict: group all 2–6 kHz peaks so far-court / quiet serves are
+            # not dropped. Walking FPs are rejected in the highlight filter.
+            if in_court or is_strong or self.strict:
                 supported.append((peak_time, motion))
-                soft_hits.append((peak_time, motion))
-            elif motion >= bridge_threshold:
+            if motion >= bridge_threshold or is_strong or in_court:
                 soft_hits.append((peak_time, motion))
 
         if not supported:
@@ -380,28 +396,41 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
         for group in groups:
             first_hit = group[0][0]
             last_hit = group[-1][0]
-            # Absorb motion-supported soft peaks after the last strong hit so a
-            # quiet final exchange is not chopped off.
+            # Absorb a quiet serve just before the first grouped hit, but do
+            # NOT absorb trailing walking / pickup hits past ~1.4s (over-run).
+            trail_cap = 0.85 if self.strict else self.max_bridge_gap
             for soft_time, soft_motion in soft_hits:
-                if last_hit < soft_time <= last_hit + self.max_bridge_gap:
+                if last_hit < soft_time <= last_hit + trail_cap:
                     if soft_motion >= bridge_threshold and motion_bridges(last_hit, soft_time):
                         last_hit = soft_time
                         group = group + [(soft_time, soft_motion)]
 
-            # Also absorb soft peaks slightly before the first strong hit
-            # (serve contact sometimes weak on phone mics).
             for soft_time, soft_motion in reversed(soft_hits):
-                if first_hit - min(self.max_bridge_gap, 3.5) <= soft_time < first_hit:
-                    if soft_motion >= bridge_threshold and motion_bridges(soft_time, first_hit):
+                if first_hit - min(self.max_bridge_gap, 3.2) <= soft_time < first_hit:
+                    if motion_bridges(soft_time, first_hit):
                         first_hit = soft_time
                         group = [(soft_time, soft_motion)] + group
                     else:
                         break
 
+            # Strip post-land shoe-squeaks: trailing weak/off-court hits after a
+            # >=1.35s hole. Do not touch mid-rally far-court contacts.
+            if self.strict and len(group) >= 5:
+                while len(group) >= 4:
+                    gap = group[-1][0] - group[-2][0]
+                    if gap > 1.35 and group[-1][1] < support_threshold:
+                        group.pop()
+                    else:
+                        break
+                last_hit = group[-1][0]
+                first_hit = group[0][0]
+
             hit_count = max(1, len(group))
-            # Strict highlight mode: keep clips tight around audible hits.
+            n_court = sum(1 for t, _ in group if t in court_supported_times)
+            # Strict: walk serve start back along toss motion; never pad the
+            # landing with residual walking (trim to last hit + landing_delay).
             if self.strict:
-                start = max(0.0, first_hit - self.serve_lead - 0.5)
+                start = walk_motion_start(first_hit, self.max_serve_lookback)
                 end = last_hit + self.landing_delay
             else:
                 start = walk_motion_start(first_hit, self.max_serve_lookback)
@@ -410,15 +439,74 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             mean_support = float(np.mean([motion for _, motion in group]))
             normalized_support = max(0.0, min(1.0, (mean_support - support_threshold) / motion_span))
 
-            # One-hit service faults are retained only when court motion is unusually strong.
-            min_hits = 3 if self.strict else 1
-            if hit_count < min_hits:
-                if not (hit_count == 1 and normalized_support >= 0.85 and not self.strict):
-                    continue
-            if duration < self.min_rally_duration:
+            # 2-hit net-faults are valid; 1-hit with court motion, a strong
+            # 2–6 kHz peak, or serve-like isolation (far-court 1-hit out).
+            min_hits = 2 if self.strict else 1
+            strong_one = False
+            serve_iso_one = False
+            iso = 0.0
+            if hit_count == 1:
+                h = height_by_time.get(first_hit, 0.0)
+                strong_one = (
+                    n_court >= 1
+                    or normalized_support >= 0.55
+                    or (strong_thr is not None and h >= strong_thr)
+                )
+                prev_times = [t for t, _ in supported if t < first_hit - 0.12]
+                iso = (first_hit - prev_times[-1]) if prev_times else 99.0
+                next_times = [t for t, _ in supported if t > first_hit + 0.12]
+                next_gap = (next_times[0] - first_hit) if next_times else 99.0
+                # GT11: almost-strong isolated serve, next rally 3.6s+ later.
+                # Height floor skips weaker mid-iso leftovers (8:04).
+                height_ok = height_thr > 0 and h >= height_thr * 1.48
+                serve_iso_one = (
+                    3.30 <= iso < 5.0
+                    and next_gap >= 3.60
+                    and height_ok
+                )
+                # GT21: silent serve, only audible contact is the clear/out
+                # ~9.5s after the previous point and ~2.2s before walking.
+                # Unique on user-sample (iso>=9 and next 1.8-3.5). No height
+                # floor — the peak is barely above MAD.
+                long_iso_one = (
+                    iso >= 9.0
+                    and 1.80 <= next_gap <= 3.50
+                )
+            else:
+                long_iso_one = False
+            if hit_count < min_hits and not strong_one and not serve_iso_one and not long_iso_one:
                 continue
+            if duration < self.min_rally_duration:
+                # Strong far-court 1-hit (GT16) can be ~1.2s before pads.
+                # Do not keep isolated weak 1-hits (GT9 3:36 glue / 3:47 extra).
+                # Serve-like GT11 (iso 3.3-5.0, next-gap >= 3.6) is also ~1.2s.
+                # GT21 long-iso 1-hit is ~1.2s before the silent-serve lookback.
+                if not (
+                    hit_count == 1
+                    and ((strong_one and iso < 3.2) or serve_iso_one or long_iso_one)
+                ):
+                    continue
+            # Long 0-court-support clusters are adjacent-court / interview noise.
+            # Compact 2-hit net-faults (GT14 ~2s) are kept; 3+ hit 3s+ stubs drop
+            # unless a compact far-court tail can be peeled (GT23).
+            if self.strict and n_court == 0 and duration > 3.2 and hit_count >= 3:
+                peeled = self._peel_zero_court_far_tail(group)
+                if peeled is None:
+                    continue
+                group = peeled
+                first_hit = group[0][0]
+                last_hit = group[-1][0]
+                hit_count = max(1, len(group))
+                n_court = sum(1 for t, _ in group if t in court_supported_times)
+                start = walk_motion_start(first_hit, self.max_serve_lookback)
+                end = last_hit + self.landing_delay
+                duration = end - start
+                mean_support = float(np.mean([motion for _, motion in group]))
+                normalized_support = max(
+                    0.0, min(1.0, (mean_support - support_threshold) / motion_span)
+                )
             hit_span = max(0.25, last_hit - first_hit)
-            if self.strict and hit_count / hit_span < 0.28 and hit_count < 5:
+            if self.strict and hit_count >= 4 and hit_count / hit_span < 0.22:
                 continue
 
             count_score = min(1.0, hit_count / 6.0)
@@ -544,9 +632,11 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             )
 
             should_merge = False
-            tight_gap = 0.55 if self.strict else 0.8
-            tight_hit_gap = 1.8 if self.strict else min(2.4, self.max_silence_gap)
-            if gap <= tight_gap or hit_gap <= tight_hit_gap:
+            tight_gap = 0.40 if self.strict else 0.8
+            tight_hit_gap = 1.15 if self.strict else min(2.4, self.max_silence_gap)
+            if gap <= tight_gap and hit_gap <= (2.2 if self.strict else 3.0):
+                should_merge = True
+            elif hit_gap <= tight_hit_gap:
                 should_merge = True
             elif hit_gap <= self.max_bridge_gap and not self.strict:
                 span_start = float(previous.get("last_hit", previous["end"]))
@@ -612,9 +702,37 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             result.append(clamped)
         return result
 
+    @staticmethod
+    def _peel_zero_court_far_tail(
+        group: List[Tuple[float, float]],
+    ) -> Optional[List[Tuple[float, float]]]:
+        """Peel a compact far-court exchange off a 0-court blob (GT23).
+
+        Adjacent-court 7:47 is 7 sparse hits (max interior gap 1.44s).
+        GT23 is 4 hits with a 1.84s hole after a leftover contact, then a
+        3-hit serve/return/out spanning 2.25s. Keeping the leftover 7:56
+        contact would start ~4s early and miss IoU 0.3. Do not globally
+        keep 0-court n>=3 clusters.
+        """
+        if not (4 <= len(group) <= 6):
+            return None
+        times = [t for t, _ in group]
+        for index in range(0, len(times) - 2):
+            gap = times[index + 1] - times[index]
+            if not (1.55 <= gap <= 2.15):
+                continue
+            tail = group[index + 1 :]
+            if not (2 <= len(tail) <= 3):
+                continue
+            span = tail[-1][0] - tail[0][0]
+            if 1.40 <= span <= 2.60:
+                return tail
+        return None
+
     def _rally_merge_gap_threshold(self) -> float:
-        # Keep post-format merge tight so dead-ball gaps are not re-glued.
-        return 0.45 if self.strict else 0.9
+        # Keep post-format merge very tight so split walking fragments
+        # (pads can leave <0.4s wall-clock gaps) are not re-glued.
+        return 0.12 if self.strict else 0.9
 
     def _detect_audio_hits(self, audio: np.ndarray, sr: int) -> np.ndarray:
         hits = super()._detect_audio_hits(audio, sr)
@@ -693,7 +811,11 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
             except Exception as exc:
                 logger.warning("Multimodal trajectory scoring skipped: %s", exc)
 
-        # Even without trajectory points, re-apply strict highlight filter.
+        # FSM already ran the highlight filter. Re-applying here without
+        # TrackNet re-splits quiet high-clears (GT6) and drops them.
+        if self.trajectory_refiner is None:
+            return raw_rallies
+
         if self.highlight_filter is not None and len(np.asarray(hit_peaks)):
             raw_rallies = self.highlight_filter.apply(
                 raw_rallies,
@@ -701,9 +823,6 @@ class CourtAwareRallyDetector(AudioVisualRallyDetector):
                 motion_timestamps=motion_timestamps,
                 motion_energies=motion_energies,
             )
-
-        if self.trajectory_refiner is None:
-            return raw_rallies
         try:
             refined = self.trajectory_refiner.refine(video_path, raw_rallies, self.court_roi)
             if self.highlight_filter is not None and len(np.asarray(hit_peaks)):

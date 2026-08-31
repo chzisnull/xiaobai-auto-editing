@@ -9,6 +9,7 @@ data class RallySegment(
     val confidence: Double = 0.8,
     val firstHit: Double = start,
     val lastHit: Double = end,
+    val primaryCourtPeel: Boolean = false,
 ) {
     val duration: Double get() = (end - start).coerceAtLeast(0.0)
 
@@ -18,12 +19,14 @@ data class RallySegment(
         confidence: Double = this.confidence,
         firstHit: Double = this.firstHit,
         lastHit: Double = this.lastHit,
+        primaryCourtPeel: Boolean = this.primaryCourtPeel,
     ): RallySegment = RallySegment(
         start = start,
         end = end.coerceAtLeast(start + 0.25),
         confidence = confidence,
         firstHit = firstHit,
         lastHit = lastHit,
+        primaryCourtPeel = primaryCourtPeel,
     )
 }
 

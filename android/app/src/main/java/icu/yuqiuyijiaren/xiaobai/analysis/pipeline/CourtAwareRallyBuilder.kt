@@ -10,13 +10,13 @@ import kotlin.math.min
 class CourtAwareRallyBuilder(
     private val strict: Boolean = true,
     private val motionThreshold: Double = 0.01,
-    private val maxSilenceGap: Double = 2.6,
-    private val maxBridgeGap: Double = 3.2,
-    private val minRallyDuration: Double = 1.5,
-    private val serveLead: Double = 0.35,
-    private val landingDelay: Double = 0.95,
-    private val maxServeLookback: Double = 2.5,
-    private val residualMotionWindow: Double = 1.8,
+    private val maxSilenceGap: Double = 1.85,
+    private val maxBridgeGap: Double = 4.2,
+    private val minRallyDuration: Double = 1.35,
+    private val serveLead: Double = 0.50,
+    private val landingDelay: Double = 0.70,
+    private val maxServeLookback: Double = 2.4,
+    private val residualMotionWindow: Double = 1.0,
     private val visualFps: Int = 8,
 ) {
     fun build(hits: DoubleArray, motion: MotionSeries?): List<RallySegment> {
@@ -29,7 +29,7 @@ class CourtAwareRallyBuilder(
         val medianMotion = median(motionE)
         val activeMotion = percentile(motionE, 0.85)
         val motionRange = max(0.0, activeMotion - medianMotion)
-        val supportThreshold = max(motionThreshold, medianMotion + 0.20 * motionRange)
+        val supportThreshold = max(motionThreshold * 0.6, medianMotion + 0.10 * motionRange)
         val bridgeThreshold = max(motionThreshold * 0.55, medianMotion + 0.08 * motionRange)
         val residualThreshold = max(motionThreshold * 0.45, medianMotion + 0.06 * motionRange)
         val onsetThreshold = max(motionThreshold * 0.50, medianMotion + 0.10 * motionRange)
@@ -119,12 +119,15 @@ class CourtAwareRallyBuilder(
 
         val softHits = ArrayList<Pair<Double, Double>>()
         val supported = ArrayList<Pair<Double, Double>>()
+        val courtSupported = HashSet<Double>()
         for (peak in hits) {
             val m = localMotion(peak)
-            if (m >= supportThreshold) {
+            val inCourt = m >= supportThreshold
+            if (inCourt) courtSupported.add(peak)
+            if (inCourt || strict) {
                 supported.add(peak to m)
-                softHits.add(peak to m)
-            } else if (m >= bridgeThreshold) {
+            }
+            if (m >= bridgeThreshold || inCourt) {
                 softHits.add(peak to m)
             }
         }
@@ -140,8 +143,8 @@ class CourtAwareRallyBuilder(
             if (gap <= maxSilenceGap) return true
             if (gap > maxBridgeGap) return false
             val (meanEnergy, activeFraction) = intervalStats(previousHit, nextHit)
-            val pureMotionCap = if (strict) 3.6 else 4.5
-            val pureMotionFrac = if (strict) 0.48 else 0.55
+            val pureMotionCap = if (strict) 2.6 else 4.5
+            val pureMotionFrac = 0.55
             if (
                 gap <= min(maxBridgeGap, pureMotionCap) &&
                 activeFraction >= pureMotionFrac &&
@@ -181,8 +184,9 @@ class CourtAwareRallyBuilder(
             var group = groupIn.toMutableList()
             var firstHit = group.first().first
             var lastHit = group.last().first
+            val trailCap = if (strict) 0.85 else maxBridgeGap
             for ((softTime, softMotion) in softHits) {
-                if (softTime > lastHit && softTime <= lastHit + maxBridgeGap) {
+                if (softTime > lastHit && softTime <= lastHit + trailCap) {
                     if (softMotion >= bridgeThreshold && motionBridges(lastHit, softTime)) {
                         lastHit = softTime
                         group.add(softTime to softMotion)
@@ -199,17 +203,80 @@ class CourtAwareRallyBuilder(
                     }
                 }
             }
-            val hitCount = max(1, group.size)
+            if (strict && group.size >= 5) {
+                while (group.size >= 4) {
+                    val gap = group.last().first - group[group.lastIndex - 1].first
+                    if (gap > 1.35 && group.last().second < supportThreshold) {
+                        group.removeAt(group.lastIndex)
+                    } else {
+                        break
+                    }
+                }
+                lastHit = group.last().first
+                firstHit = group.first().first
+            }
+            var hitCount = max(1, group.size)
             val start = walkMotionStart(firstHit)
-            val end = walkMotionEnd(lastHit)
+            // Strict: trim to last hit; do not pad walking residual motion.
+            val end = if (strict) lastHit + landingDelay else walkMotionEnd(lastHit)
             val duration = end - start
             val meanSupport = group.map { it.second }.average()
             val normalizedSupport = ((meanSupport - supportThreshold) / motionSpan).coerceIn(0.0, 1.0)
-            val minHits = if (strict) 3 else 1
-            if (hitCount < minHits) continue
-            if (duration < minRallyDuration) continue
+            val minHits = if (strict) 2 else 1
+            var strongOne = false
+            var serveIsoOne = false
+            var longIsoOne = false
+            var iso = 0.0
+            if (hitCount == 1) {
+                strongOne = normalizedSupport >= 0.55 || group.first().second >= supportThreshold
+                val prevIdx = supported.indexOfFirst { kotlin.math.abs(it.first - firstHit) < 1e-6 }
+                iso = if (prevIdx > 0) firstHit - supported[prevIdx - 1].first else 99.0
+                val nextGap = if (prevIdx >= 0 && prevIdx < supported.lastIndex) {
+                    supported[prevIdx + 1].first - firstHit
+                } else {
+                    99.0
+                }
+                // GT11-style isolated serve. No peak-height channel on device;
+                // isolation + next-gap is the gate (weaker 8:04 leftovers are
+                // still filtered by highlight far-court-one + duration).
+                serveIsoOne = iso >= 3.30 && iso < 5.0 && nextGap >= 3.60
+                // GT21: silent serve, only audible contact ~9s after previous point.
+                longIsoOne = iso >= 9.0 && nextGap in 1.80..3.50
+            }
+            if (hitCount < minHits && !strongOne && !serveIsoOne && !longIsoOne) continue
+            if (duration < minRallyDuration) {
+                if (!(hitCount == 1 && ((strongOne && iso < 3.2) || serveIsoOne || longIsoOne))) continue
+            }
+            var nCourt = group.count { it.first in courtSupported }
+            if (strict && nCourt == 0 && duration > 3.2 && hitCount >= 3) {
+                val peeled = peelZeroCourtFarTail(group)
+                    ?: continue
+                group = peeled.toMutableList()
+                firstHit = group.first().first
+                lastHit = group.last().first
+                hitCount = max(1, group.size)
+                nCourt = group.count { it.first in courtSupported }
+                val peeledStart = walkMotionStart(firstHit)
+                val peeledEnd = lastHit + landingDelay
+                val peeledMean = group.map { it.second }.average()
+                val peeledNorm = ((peeledMean - supportThreshold) / motionSpan).coerceIn(0.0, 1.0)
+                val peeledHitSpan = max(0.25, lastHit - firstHit)
+                if (hitCount >= 4 && hitCount / peeledHitSpan < 0.22) continue
+                val peeledCountScore = min(1.0, hitCount / 6.0)
+                val peeledConf = min(0.99, 0.48 + 0.30 * peeledCountScore + 0.22 * peeledNorm)
+                rallies.add(
+                    RallySegment(
+                        start = peeledStart,
+                        end = peeledEnd,
+                        confidence = peeledConf,
+                        firstHit = firstHit,
+                        lastHit = lastHit,
+                    ),
+                )
+                continue
+            }
             val hitSpan = max(0.25, lastHit - firstHit)
-            if (strict && hitCount / hitSpan < 0.28 && hitCount < 5) continue
+            if (strict && hitCount >= 4 && hitCount / hitSpan < 0.22) continue
             val countScore = min(1.0, hitCount / 6.0)
             val confidence = min(0.99, 0.48 + 0.30 * countScore + 0.22 * normalizedSupport)
             rallies.add(
@@ -226,6 +293,24 @@ class CourtAwareRallyBuilder(
         return splitOverlong(merged)
     }
 
+    private fun peelZeroCourtFarTail(
+        group: List<Pair<Double, Double>>,
+    ): List<Pair<Double, Double>>? {
+        // GT23: leftover contact then 1.55–2.15s hole and a compact 2–3 hit tail.
+        // Adjacent-court 7:47 is 7 hits with max interior gap 1.44s.
+        if (group.size !in 4..6) return null
+        val times = group.map { it.first }
+        for (i in 0 until times.size - 2) {
+            val gap = times[i + 1] - times[i]
+            if (gap !in 1.55..2.15) continue
+            val tail = group.subList(i + 1, group.size)
+            if (tail.size !in 2..3) continue
+            val span = tail.last().first - tail.first().first
+            if (span in 1.40..2.60) return tail.toList()
+        }
+        return null
+    }
+
     private fun buildAudioOnly(hits: DoubleArray): List<RallySegment> {
         if (hits.isEmpty()) return emptyList()
         val groups = ArrayList<MutableList<Double>>()
@@ -240,7 +325,7 @@ class CourtAwareRallyBuilder(
             }
         }
         groups.add(current)
-        val minHits = if (strict) 3 else 2
+        val minHits = if (strict) 2 else 2
         return groups.mapNotNull { group ->
             if (group.size < minHits) return@mapNotNull null
             val first = group.first()
@@ -298,7 +383,9 @@ class CourtAwareRallyBuilder(
             var should = false
             // Align with desktop strict merge: tight wall-clock gap OR tight hit gap
             if (projected <= 24.0) {
-                if (gap <= 0.55 || hitGap <= 1.8) {
+                if (gap <= 0.40 && hitGap <= 2.2) {
+                    should = true
+                } else if (hitGap <= 1.15) {
                     should = true
                 } else if (hitGap <= maxBridgeGap && gap <= 2.2) {
                     val left = motionT.leftIndex(prev.lastHit)
