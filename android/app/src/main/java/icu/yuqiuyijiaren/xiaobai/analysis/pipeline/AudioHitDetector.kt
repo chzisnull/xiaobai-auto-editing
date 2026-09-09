@@ -51,9 +51,7 @@ class AudioHitDetector(
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
         try {
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                extractor.setDataSource(pfd.fileDescriptor)
-            } ?: extractor.setDataSource(context, uri, null)
+            icu.yuqiuyijiaren.xiaobai.domain.MediaSourceHelper.setExtractorDataSource(extractor, context, uri)
 
             val trackIndex = (0 until extractor.trackCount).firstOrNull { index ->
                 extractor.getTrackFormat(index).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true

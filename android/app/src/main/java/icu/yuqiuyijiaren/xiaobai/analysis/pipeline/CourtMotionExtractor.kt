@@ -68,9 +68,7 @@ class CourtMotionExtractor(
         val extractor = MediaExtractor()
         var codec: MediaCodec? = null
         try {
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                extractor.setDataSource(pfd.fileDescriptor)
-            } ?: extractor.setDataSource(context, uri, null)
+            icu.yuqiuyijiaren.xiaobai.domain.MediaSourceHelper.setExtractorDataSource(extractor, context, uri)
 
             val trackIndex = (0 until extractor.trackCount).firstOrNull { i ->
                 extractor.getTrackFormat(i).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
@@ -238,9 +236,7 @@ class CourtMotionExtractor(
     ): MotionSeries {
         val retriever = MediaMetadataRetriever()
         try {
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                retriever.setDataSource(pfd.fileDescriptor)
-            } ?: retriever.setDataSource(context, uri)
+            icu.yuqiuyijiaren.xiaobai.domain.MediaSourceHelper.setRetrieverDataSource(retriever, context, uri)
 
             val mask = buildCourtMask(width, height, courtRoi)
             // SYNC keyframes only — never OPTION_CLOSEST on full film

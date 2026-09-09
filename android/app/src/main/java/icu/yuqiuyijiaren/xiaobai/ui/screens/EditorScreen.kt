@@ -6,9 +6,14 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -19,68 +24,93 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CallMerge
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.SportsTennis
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
-import kotlinx.coroutines.launch
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import icu.yuqiuyijiaren.xiaobai.EditorViewModel
+import icu.yuqiuyijiaren.xiaobai.domain.AnalysisPhase
 import icu.yuqiuyijiaren.xiaobai.domain.EditorEvent
 import icu.yuqiuyijiaren.xiaobai.domain.EditorUiState
+import icu.yuqiuyijiaren.xiaobai.domain.Rally
+import icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus
 import icu.yuqiuyijiaren.xiaobai.domain.VideoSource
 import icu.yuqiuyijiaren.xiaobai.ui.components.CourtRoiOverlay
 import icu.yuqiuyijiaren.xiaobai.ui.components.EditorTopBar
 import icu.yuqiuyijiaren.xiaobai.ui.components.LocalVideoPlayer
-import icu.yuqiuyijiaren.xiaobai.ui.components.RallyInspector
 import icu.yuqiuyijiaren.xiaobai.ui.components.ZoomableRallyTimeline
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Amber
+import icu.yuqiuyijiaren.xiaobai.ui.theme.BorderSubtle
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Blue
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Canvas
+import icu.yuqiuyijiaren.xiaobai.ui.theme.Green
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Ink
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Muted
+import icu.yuqiuyijiaren.xiaobai.ui.theme.Red
+import icu.yuqiuyijiaren.xiaobai.ui.theme.StudioElevated
+import icu.yuqiuyijiaren.xiaobai.ui.theme.SurfaceGlass
 import java.io.File
 import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,10 +119,10 @@ fun EditorScreen(viewModel: EditorViewModel) {
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    var showRalliesSheet by remember { mutableStateOf(false) }
 
     fun handlePickedUri(uri: Uri?) {
         if (uri == null) return
-        // Persist read access when possible (SAF / OpenDocument)
         runCatching {
             context.contentResolver.takePersistableUriPermission(
                 uri,
@@ -101,23 +131,60 @@ fun EditorScreen(viewModel: EditorViewModel) {
         }
         val source = readVideoSource(context, uri)
         if (source == null) {
-            scope.launch {
-                snackbar.showSnackbar("无法读取该视频（时长或权限异常）")
-            }
+            scope.launch { snackbar.showSnackbar("无法读取该视频（时长或权限异常）") }
         } else {
             viewModel.onEvent(EditorEvent.VideoPicked(source))
         }
     }
 
-    // System photo picker — sometimes empty on emulators after adb push
     val galleryPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri -> handlePickedUri(uri) }
 
-    // SAF document picker — can open Download / Movies reliably for test clips
     val filePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
     ) { uri -> handlePickedUri(uri) }
+
+    val onPickGallery: () -> Unit = {
+        galleryPicker.launch(
+            androidx.activity.result.PickVisualMediaRequest(
+                ActivityResultContracts.PickVisualMedia.VideoOnly,
+            ),
+        )
+    }
+    val onPickFile: () -> Unit = {
+        filePicker.launch(arrayOf("video/*", "video/mp4", "video/3gpp", "video/webm"))
+    }
+
+    val onLoadSample: () -> Unit = {
+        val candidates = listOf(
+            File(context.getExternalFilesDir(null), "badminton_match.mp4"),
+            File("/sdcard/Android/data/icu.yuqiuyijiaren.xiaobai.debug/files/badminton_match.mp4"),
+            File("/sdcard/Download/badminton_match.mp4"),
+            File("/sdcard/Movies/badminton_match.mp4"),
+            File("/sdcard/Download/badminton_sample.mp4"),
+        )
+        val rawFile = candidates.firstOrNull { it.exists() && it.canRead() }
+            ?: candidates.firstOrNull { it.exists() }
+        if (rawFile != null) {
+            val targetFile = File(context.getExternalFilesDir(null) ?: context.filesDir, rawFile.name).let { dest ->
+                if (!dest.exists() || dest.length() != rawFile.length()) {
+                    try { rawFile.copyTo(dest, overwrite = true) } catch (_: Exception) {}
+                }
+                if (dest.exists() && dest.canRead()) dest else rawFile
+            }
+            val sampleUri = Uri.fromFile(targetFile)
+            val source = readVideoSource(context, sampleUri) ?: VideoSource(
+                uriString = sampleUri.toString(),
+                displayName = targetFile.name,
+                durationMs = 451033L,
+            )
+            viewModel.onEvent(EditorEvent.VideoPicked(source))
+            scope.launch { snackbar.showSnackbar("已载入测试比赛视频（${formatClock(source.durationSec)}）") }
+        } else {
+            scope.launch { snackbar.showSnackbar("请点击「选文件」或「相册」导入比赛视频") }
+        }
+    }
 
     LaunchedEffect(state.errorMessage) {
         val msg = state.errorMessage
@@ -138,7 +205,6 @@ fun EditorScreen(viewModel: EditorViewModel) {
                 "合并完成；相册写入失败，可从分享面板另存"
             }
             snackbar.showSnackbar(savedMsg)
-            // Optional share sheet after local save
             shareExportedVideo(context, path)
             viewModel.onEvent(EditorEvent.ClearExportPath)
         }
@@ -148,40 +214,35 @@ fun EditorScreen(viewModel: EditorViewModel) {
         containerColor = Canvas,
         topBar = {
             EditorTopBar(
-                deviceSummary = state.deviceSummary,
-                capabilityLine = state.deviceCapabilityLine,
-                selectedTier = state.analysisTier,
-                recommendedTier = state.recommendedTier,
-                configSummary = state.analysisConfigSummary,
+                tier = state.analysisTier,
                 canUndo = state.canUndo,
                 roiActive = state.showRoiEditor,
                 roiEnabled = state.source != null,
-                analyzing = state.isAnalyzing,
-                onSelectTier = { viewModel.onEvent(EditorEvent.SetAnalysisTier(it)) },
                 onUndo = { viewModel.onEvent(EditorEvent.Undo) },
                 onToggleRoi = {
                     if (state.showRoiEditor) viewModel.onEvent(EditorEvent.HideRoiEditor)
                     else viewModel.onEvent(EditorEvent.ShowRoiEditor)
                 },
+                onPickFile = onPickFile,
+                onOpenTierSelector = {
+                    // Cycle through tiers: Fast -> Standard -> Precise -> Fast
+                    val nextTier = when (state.analysisTier) {
+                        icu.yuqiuyijiaren.xiaobai.domain.AnalysisTier.Fast -> icu.yuqiuyijiaren.xiaobai.domain.AnalysisTier.Standard
+                        icu.yuqiuyijiaren.xiaobai.domain.AnalysisTier.Standard -> icu.yuqiuyijiaren.xiaobai.domain.AnalysisTier.Precise
+                        icu.yuqiuyijiaren.xiaobai.domain.AnalysisTier.Precise -> icu.yuqiuyijiaren.xiaobai.domain.AnalysisTier.Fast
+                    }
+                    viewModel.onEvent(EditorEvent.SetAnalysisTier(nextTier))
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbar) },
         bottomBar = {
-            // Export must live in bottomBar so it is never clipped by the middle Column.
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xF2F2F2F7)),
-            ) {
-                ExportButton(
-                    state = state,
-                    viewModel = viewModel,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-                TimelineBar(state, viewModel)
-            }
+            // Sticky CapCut-style Thumb Action Zone
+            StickyThumbActionZone(
+                state = state,
+                viewModel = viewModel,
+                onOpenRalliesSheet = { showRalliesSheet = true },
+            )
         },
     ) { padding ->
         BoxWithConstraints(
@@ -190,55 +251,428 @@ fun EditorScreen(viewModel: EditorViewModel) {
                 .padding(padding),
         ) {
             val landscape = maxWidth > maxHeight
-            val onPickGallery: () -> Unit = {
-                galleryPicker.launch(
-                    androidx.activity.result.PickVisualMediaRequest(
-                        ActivityResultContracts.PickVisualMedia.VideoOnly,
-                    ),
-                )
-            }
-            val onPickFile: () -> Unit = {
-                filePicker.launch(arrayOf("video/*", "video/mp4", "video/3gpp", "video/webm"))
-            }
             if (landscape) {
-                LandscapeBody(
+                LandscapeLayout(
                     state = state,
                     viewModel = viewModel,
-                    onPickGallery = onPickGallery,
                     onPickFile = onPickFile,
+                    onPickGallery = onPickGallery,
+                    onLoadSample = onLoadSample,
                 )
             } else {
-                PortraitBody(
+                PortraitLayout(
                     state = state,
                     viewModel = viewModel,
-                    onPickGallery = onPickGallery,
                     onPickFile = onPickFile,
+                    onPickGallery = onPickGallery,
+                    onLoadSample = onLoadSample,
+                )
+            }
+        }
+    }
+
+    // Modal Bottom Sheet for Rallies List
+    if (showRalliesSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showRalliesSheet = false },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            containerColor = SurfaceGlass,
+            dragHandle = {
+                Box(
+                    modifier = Modifier
+                        .padding(top = 10.dp, bottom = 6.dp)
+                        .width(36.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color(0x44FFFFFF)),
+                )
+            },
+        ) {
+            RalliesBottomSheetContent(
+                state = state,
+                viewModel = viewModel,
+                onClose = { showRalliesSheet = false },
+            )
+        }
+    }
+}
+
+/**
+ * Portrait Layout:
+ * 1. Video Player Studio Container
+ * 2. Match Metrics & AI Analysis Bar
+ * 3. Precision Zoomable Timeline
+ * 4. Fast Rally Trim Strip
+ */
+@Composable
+private fun PortraitLayout(
+    state: EditorUiState,
+    viewModel: EditorViewModel,
+    onPickFile: () -> Unit,
+    onPickGallery: () -> Unit,
+    onLoadSample: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        // 1. Video Container
+        VideoPlayerSection(
+            state = state,
+            viewModel = viewModel,
+            onPickFile = onPickFile,
+            onPickGallery = onPickGallery,
+            onLoadSample = onLoadSample,
+        )
+
+        // 2. Metrics & AI Analysis Banner
+        StatusAndAnalysisBanner(state = state, viewModel = viewModel)
+
+        // 3. Precision Timeline
+        TimelineSection(state = state, viewModel = viewModel)
+
+        // 4. Quick Rally Switcher Strip (1-tap fast switching between all rallies)
+        if (state.rallies.isNotEmpty()) {
+            RallyQuickSwitchStrip(
+                rallies = state.rallies,
+                selectedIndex = state.selectedRallyIndex,
+                onSelectRally = { viewModel.onEvent(EditorEvent.SelectRally(it)) },
+                onSelectPrevious = { viewModel.onEvent(EditorEvent.SelectPrevious) },
+                onSelectNext = { viewModel.onEvent(EditorEvent.SelectNext) },
+            )
+        }
+
+        // 5. Fast Rally Trim Zone (directly accessible above sticky bottom bar)
+        FastRallyTrimZone(state = state, viewModel = viewModel)
+    }
+}
+
+/**
+ * Landscape Layout: Left video player, right timeline and quick trim
+ */
+@Composable
+private fun LandscapeLayout(
+    state: EditorUiState,
+    viewModel: EditorViewModel,
+    onPickFile: () -> Unit,
+    onPickGallery: () -> Unit,
+    onLoadSample: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .weight(0.55f)
+                .fillMaxHeight(),
+        ) {
+            VideoPlayerSection(
+                state = state,
+                viewModel = viewModel,
+                onPickFile = onPickFile,
+                onPickGallery = onPickGallery,
+                onLoadSample = onLoadSample,
+                fillHeight = true,
+            )
+        }
+
+        Column(
+            modifier = Modifier
+                .weight(0.45f)
+                .fillMaxHeight(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            StatusAndAnalysisBanner(state = state, viewModel = viewModel)
+            TimelineSection(state = state, viewModel = viewModel)
+            if (state.rallies.isNotEmpty()) {
+                RallyQuickSwitchStrip(
+                    rallies = state.rallies,
+                    selectedIndex = state.selectedRallyIndex,
+                    onSelectRally = { viewModel.onEvent(EditorEvent.SelectRally(it)) },
+                    onSelectPrevious = { viewModel.onEvent(EditorEvent.SelectPrevious) },
+                    onSelectNext = { viewModel.onEvent(EditorEvent.SelectNext) },
+                )
+            }
+            FastRallyTrimZone(state = state, viewModel = viewModel)
+        }
+    }
+}
+
+/**
+ * Video Player Section: Contains Custom VideoPlayer or Sleek Empty State
+ */
+@Composable
+private fun VideoPlayerSection(
+    state: EditorUiState,
+    viewModel: EditorViewModel,
+    onPickFile: () -> Unit,
+    onPickGallery: () -> Unit,
+    onLoadSample: () -> Unit,
+    fillHeight: Boolean = false,
+) {
+    if (state.source == null) {
+        // Empty State Dark Studio Card
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier.height(200.dp))
+                .clip(RoundedCornerShape(14.dp))
+                .background(SurfaceGlass)
+                .border(1.dp, BorderSubtle, RoundedCornerShape(14.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.padding(16.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(StudioElevated),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        Icons.Default.Videocam,
+                        contentDescription = null,
+                        tint = Blue,
+                        modifier = Modifier.size(26.dp),
+                    )
+                }
+
+                Text(
+                    text = "导入羽毛球比赛视频开始智能剪辑",
+                    color = Ink,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = onPickFile,
+                        colors = ButtonDefaults.buttonColors(containerColor = Blue),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("选文件", fontSize = 13.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = onPickGallery,
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, BorderSubtle),
+                    ) {
+                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, tint = Ink, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("相册", color = Ink, fontSize = 13.sp)
+                    }
+
+                    OutlinedButton(
+                        onClick = onLoadSample,
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Blue.copy(alpha = 0.5f)),
+                    ) {
+                        Text("测试视频", color = Blue, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+            }
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier.aspectRatio(16f / 9f)),
+        ) {
+            LocalVideoPlayer(
+                source = state.source,
+                playheadSec = state.playheadSec,
+                onPlayheadChange = viewModel::updatePlayhead,
+                playback = state.playback,
+                onPlaybackConsumed = { viewModel.onEvent(EditorEvent.ClearPlaybackCommand) },
+                rallies = state.rallies,
+                selectedRally = state.selectedRally,
+                smartSkip = state.smartSkip,
+                onToggleSmartSkip = { viewModel.onEvent(EditorEvent.ToggleSmartSkip) },
+                loopRally = state.loopRally,
+                onToggleLoop = { viewModel.onEvent(EditorEvent.ToggleLoopRally) },
+                fillHeight = fillHeight,
+                modifier = Modifier.fillMaxSize(),
+            )
+
+            if (state.showRoiEditor) {
+                CourtRoiOverlay(
+                    roi = state.courtRoi,
+                    onPointMove = { i, x, y ->
+                        viewModel.onEvent(EditorEvent.UpdateCourtRoiPoint(i, x, y))
+                    },
+                    modifier = Modifier.fillMaxSize(),
                 )
             }
         }
     }
 }
 
+/**
+ * Match Metrics & AI Status Strip
+ */
 @Composable
-private fun TimelineBar(state: EditorUiState, viewModel: EditorViewModel) {
+private fun StatusAndAnalysisBanner(state: EditorUiState, viewModel: EditorViewModel) {
+    if (state.isAnalyzing) {
+        // AI Analyzing Active Banner
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(Blue.copy(alpha = 0.12f))
+                .border(1.dp, Blue.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = Blue,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = state.analysis.message.ifBlank { "AI正在分析比赛回合..." },
+                            color = Ink,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0x33FFFFFF))
+                            .clickable { viewModel.onEvent(EditorEvent.CancelAnalysis) }
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    ) {
+                        Text("取消", color = Muted, fontSize = 11.sp)
+                    }
+                }
+
+                LinearProgressIndicator(
+                    progress = { state.analysis.percent.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Blue,
+                    trackColor = Color(0x33007AFF),
+                )
+            }
+        }
+    } else if (state.source != null && state.rallies.isEmpty()) {
+        // AI Analysis Call to Action
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(SurfaceGlass)
+                .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text("智能回合识别", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("击球声纹 + 场地落点自适应检测", color = Muted, fontSize = 11.sp)
+                }
+
+                Button(
+                    onClick = { viewModel.onEvent(EditorEvent.StartAnalysis) },
+                    colors = ButtonDefaults.buttonColors(containerColor = Blue),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                ) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("开始识别", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    } else if (state.rallies.isNotEmpty()) {
+        // 4 Compact Metric Chips
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            MetricPill("原片", formatClock(state.source?.durationSec ?: 0.0), modifier = Modifier.weight(1f))
+            MetricPill("成片", formatClock(state.selectedDurationSec), highlight = Green, modifier = Modifier.weight(1f))
+            MetricPill("精简", "-${state.reductionPercent}%", highlight = Amber, modifier = Modifier.weight(1f))
+            MetricPill("回合", "${state.rallies.size}段", modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+/**
+ * Precision Timeline Section
+ */
+@Composable
+private fun TimelineSection(state: EditorUiState, viewModel: EditorViewModel) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xF2F2F2F7))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .clip(RoundedCornerShape(14.dp))
+            .background(SurfaceGlass)
+            .border(1.dp, BorderSubtle, RoundedCornerShape(14.dp))
+            .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("回合时间轴", fontWeight = FontWeight.SemiBold, color = Ink, fontSize = 13.sp)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricChip("原片", formatClock(state.source?.durationSec ?: 0.0))
-                MetricChip("成片", formatClock(state.selectedDurationSec))
-                MetricChip("精简", "${state.reductionPercent}%")
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    "时间轴",
+                    color = Ink,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "播头 ${formatClock(state.playheadSec)}",
+                    color = Blue,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+
+            if (state.rallies.size >= 2) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(StudioElevated)
+                        .clickable { viewModel.onEvent(EditorEvent.MergeAdjacentRallies) }
+                        .padding(horizontal = 8.dp, vertical = 3.dp),
+                ) {
+                    Text("合并碎片", color = Blue, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                }
             }
         }
+
+        Spacer(Modifier.height(6.dp))
+
         ZoomableRallyTimeline(
             durationSec = state.source?.durationSec ?: 0.0,
             rallies = state.rallies,
@@ -258,469 +692,715 @@ private fun TimelineBar(state: EditorUiState, viewModel: EditorViewModel) {
     }
 }
 
+/**
+ * Horizontal Quick Rally Switcher Strip (CapCut / Premiere style)
+ * Allows 1-tap fast switching between all rallies with auto-scroll and prev/next steppers.
+ */
 @Composable
-private fun PortraitBody(
-    state: EditorUiState,
-    viewModel: EditorViewModel,
-    onPickGallery: () -> Unit,
-    onPickFile: () -> Unit,
+private fun RallyQuickSwitchStrip(
+    rallies: List<Rally>,
+    selectedIndex: Int?,
+    onSelectRally: (Int) -> Unit,
+    onSelectPrevious: () -> Unit,
+    onSelectNext: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    // Full-page scroll so every control is reachable; export stays in bottomBar.
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp),
-        contentPadding = PaddingValues(top = 8.dp, bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        item { ToolbarRow(state, viewModel, onPickGallery, onPickFile) }
-        item { VideoCard(state, viewModel) }
-        if (state.isAnalyzing ||
-            (state.analysis.message.isNotBlank() &&
-                state.analysis.phase != icu.yuqiuyijiaren.xiaobai.domain.AnalysisPhase.Idle)
-        ) {
-            item { AnalysisCard(state) }
-        }
-        item {
-            RallyInspector(
-                rally = state.selectedRally,
-                index = state.selectedRallyIndex,
-                total = state.rallies.size,
-                playheadSec = state.playheadSec,
-                rangeMarkInSec = state.rangeMarkInSec,
-                rangeMarkOutSec = state.rangeMarkOutSec,
-                onPlaySelected = { viewModel.onEvent(EditorEvent.PlaySelected) },
-                onPrev = { viewModel.onEvent(EditorEvent.SelectPrevious) },
-                onNext = { viewModel.onEvent(EditorEvent.SelectNext) },
-                onSetStartAtPlayhead = { viewModel.onEvent(EditorEvent.SetSelectedStartAtPlayhead) },
-                onSetEndAtPlayhead = { viewModel.onEvent(EditorEvent.SetSelectedEndAtPlayhead) },
-                onNudgeStart = { viewModel.onEvent(EditorEvent.NudgeSelectedEdge(startDelta = it)) },
-                onNudgeEnd = { viewModel.onEvent(EditorEvent.NudgeSelectedEdge(endDelta = it)) },
-                onNudgeBoth = { viewModel.onEvent(EditorEvent.NudgeSelected(it)) },
-                onMarkIn = { viewModel.onEvent(EditorEvent.MarkRangeStartAtPlayhead) },
-                onMarkOut = { viewModel.onEvent(EditorEvent.MarkRangeEndAtPlayhead) },
-                onClearMarks = { viewModel.onEvent(EditorEvent.ClearRangeMarks) },
-                onSplit = { viewModel.onEvent(EditorEvent.SplitSelectedAtPlayhead) },
-                onMergeNext = { viewModel.onEvent(EditorEvent.MergeSelectedWithNext) },
-                onDelete = {
-                    state.selectedRallyIndex?.let { viewModel.onEvent(EditorEvent.DeleteRally(it)) }
-                },
-                canMergeNext = state.selectedRallyIndex != null &&
-                    state.selectedRallyIndex < state.rallies.lastIndex,
-                onSetReviewStatus = { status ->
-                    state.selectedRallyIndex?.let { i ->
-                        viewModel.onEvent(EditorEvent.SetRallyStatus(i, status))
-                    }
-                },
-                smartSkip = state.smartSkip,
-                onToggleSmartSkip = { viewModel.onEvent(EditorEvent.ToggleSmartSkip) },
-                loopRally = state.loopRally,
-                onToggleLoop = { viewModel.onEvent(EditorEvent.ToggleLoopRally) },
-            )
-        }
-        item { RallyListHeader(state, viewModel) }
-        if (state.rallies.isEmpty()) {
-            item {
-                Text("暂无回合，请识别或用入点/出点新建", color = Muted, fontSize = 13.sp)
-            }
-        } else {
-            itemsIndexed(state.rallies) { index, rally ->
-                RallyListItem(index, rally, state.selectedRallyIndex == index, viewModel)
-            }
+    val listState = rememberLazyListState()
+
+    // Auto-scroll so selected rally is always centered in the strip
+    LaunchedEffect(selectedIndex) {
+        if (selectedIndex != null && selectedIndex in rallies.indices) {
+            val target = (selectedIndex - 1).coerceAtLeast(0)
+            listState.animateScrollToItem(target)
         }
     }
-}
 
-@Composable
-private fun LandscapeBody(
-    state: EditorUiState,
-    viewModel: EditorViewModel,
-    onPickGallery: () -> Unit,
-    onPickFile: () -> Unit,
-) {
     Row(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Column(
-            modifier = Modifier
-                .weight(0.58f)
-                .fillMaxHeight(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ToolbarRow(state, viewModel, onPickGallery, onPickFile)
-            Box(modifier = Modifier.weight(1f)) {
-                VideoCard(state, viewModel, fillHeight = true)
-            }
-            if (state.isAnalyzing ||
-                (state.analysis.message.isNotBlank() &&
-                    state.analysis.phase != icu.yuqiuyijiaren.xiaobai.domain.AnalysisPhase.Idle)
-            ) {
-                AnalysisCard(state)
-            }
-            RallyInspector(
-                rally = state.selectedRally,
-                index = state.selectedRallyIndex,
-                total = state.rallies.size,
-                playheadSec = state.playheadSec,
-                rangeMarkInSec = state.rangeMarkInSec,
-                rangeMarkOutSec = state.rangeMarkOutSec,
-                onPlaySelected = { viewModel.onEvent(EditorEvent.PlaySelected) },
-                onPrev = { viewModel.onEvent(EditorEvent.SelectPrevious) },
-                onNext = { viewModel.onEvent(EditorEvent.SelectNext) },
-                onSetStartAtPlayhead = { viewModel.onEvent(EditorEvent.SetSelectedStartAtPlayhead) },
-                onSetEndAtPlayhead = { viewModel.onEvent(EditorEvent.SetSelectedEndAtPlayhead) },
-                onNudgeStart = { viewModel.onEvent(EditorEvent.NudgeSelectedEdge(startDelta = it)) },
-                onNudgeEnd = { viewModel.onEvent(EditorEvent.NudgeSelectedEdge(endDelta = it)) },
-                onNudgeBoth = { viewModel.onEvent(EditorEvent.NudgeSelected(it)) },
-                onMarkIn = { viewModel.onEvent(EditorEvent.MarkRangeStartAtPlayhead) },
-                onMarkOut = { viewModel.onEvent(EditorEvent.MarkRangeEndAtPlayhead) },
-                onClearMarks = { viewModel.onEvent(EditorEvent.ClearRangeMarks) },
-                onSplit = { viewModel.onEvent(EditorEvent.SplitSelectedAtPlayhead) },
-                onMergeNext = { viewModel.onEvent(EditorEvent.MergeSelectedWithNext) },
-                onDelete = {
-                    state.selectedRallyIndex?.let { viewModel.onEvent(EditorEvent.DeleteRally(it)) }
-                },
-                canMergeNext = state.selectedRallyIndex != null &&
-                    state.selectedRallyIndex < state.rallies.lastIndex,
-                onSetReviewStatus = { status ->
-                    state.selectedRallyIndex?.let { i ->
-                        viewModel.onEvent(EditorEvent.SetRallyStatus(i, status))
-                    }
-                },
-                smartSkip = state.smartSkip,
-                onToggleSmartSkip = { viewModel.onEvent(EditorEvent.ToggleSmartSkip) },
-                loopRally = state.loopRally,
-                onToggleLoop = { viewModel.onEvent(EditorEvent.ToggleLoopRally) },
-            )
-        }
-        Column(
-            modifier = Modifier
-                .weight(0.42f)
-                .fillMaxHeight(),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            RallyListHeader(state, viewModel)
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                state.rallies.forEachIndexed { index, rally ->
-                    RallyListItem(index, rally, state.selectedRallyIndex == index, viewModel)
-                }
-            }
-            ExportButton(state, viewModel)
-        }
-    }
-}
-
-@Composable
-private fun ToolbarRow(
-    state: EditorUiState,
-    viewModel: EditorViewModel,
-    onPickGallery: () -> Unit,
-    onPickFile: () -> Unit,
-) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(
-            onClick = onPickFile,
-            colors = ButtonDefaults.buttonColors(containerColor = Blue),
-            shape = RoundedCornerShape(10.dp),
-        ) {
-            Icon(Icons.Default.FolderOpen, contentDescription = null)
-            Spacer(Modifier.width(6.dp))
-            Text("选文件")
-        }
-        OutlinedButton(
-            onClick = onPickGallery,
-            shape = RoundedCornerShape(10.dp),
-        ) {
-            Text("相册")
-        }
-        Button(
-            onClick = { viewModel.onEvent(EditorEvent.StartAnalysis) },
-            enabled = state.source != null && !state.isAnalyzing,
-            colors = ButtonDefaults.buttonColors(containerColor = Blue),
-            shape = RoundedCornerShape(10.dp),
-        ) {
-            Icon(Icons.Default.AutoAwesome, contentDescription = null)
-            Spacer(Modifier.width(6.dp))
-            Text(if (state.isAnalyzing) "分析中" else "开始识别")
-        }
-        if (state.isAnalyzing) {
-            OutlinedButton(
-                onClick = { viewModel.onEvent(EditorEvent.CancelAnalysis) },
-                shape = RoundedCornerShape(10.dp),
-            ) {
-                Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("取消")
-            }
-        }
-        if (state.showRoiEditor) {
-            OutlinedButton(
-                onClick = { viewModel.onEvent(EditorEvent.ResetCourtRoi) },
-                shape = RoundedCornerShape(10.dp),
-            ) { Text("重置ROI") }
-            OutlinedButton(
-                onClick = { viewModel.onEvent(EditorEvent.HideRoiEditor) },
-                shape = RoundedCornerShape(10.dp),
-            ) { Text("完成标定") }
-        }
-    }
-}
-
-@Composable
-private fun VideoCard(state: EditorUiState, viewModel: EditorViewModel, fillHeight: Boolean = false) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color.White.copy(alpha = 0.82f)),
-        shape = RoundedCornerShape(14.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
-            .then(if (fillHeight) Modifier.fillMaxHeight() else Modifier)
-            .border(1.dp, Color(0x28767680), RoundedCornerShape(14.dp)),
-    ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            if (state.source == null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(200.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF111113)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("从相册选择羽毛球比赛视频", color = Color(0xFFAEAEB2))
-                }
-            } else {
-                Box {
-                    LocalVideoPlayer(
-                        source = state.source,
-                        playheadSec = state.playheadSec,
-                        onPlayheadChange = viewModel::updatePlayhead,
-                        playback = state.playback,
-                        onPlaybackConsumed = { viewModel.onEvent(EditorEvent.ClearPlaybackCommand) },
-                        rallies = state.rallies,
-                        selectedRally = state.selectedRally,
-                        smartSkip = state.smartSkip,
-                        loopRally = state.loopRally,
-                        fillHeight = fillHeight,
-                        modifier = if (fillHeight) Modifier.fillMaxSize() else Modifier,
-                    )
-                    if (state.showRoiEditor) {
-                        CourtRoiOverlay(
-                            roi = state.courtRoi,
-                            onPointMove = { i, x, y ->
-                                viewModel.onEvent(EditorEvent.UpdateCourtRoiPoint(i, x, y))
-                            },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(6.dp))
-                val source = state.source
-                if (source != null) {
-                    Text(
-                        text = "${source.displayName} · ${formatClock(source.durationSec)}",
-                        color = Muted,
-                        fontSize = 12.sp,
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AnalysisCard(state: EditorUiState) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = Color(0x14007AFF)),
-        shape = RoundedCornerShape(12.dp),
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (state.isAnalyzing) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = Blue,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                }
-                Text(
-                    state.analysis.message.ifBlank { "准备中" },
-                    color = Ink,
-                    fontSize = 13.sp,
-                    maxLines = 2,
-                )
-            }
-            if (state.isAnalyzing) {
-                Spacer(Modifier.height(6.dp))
-                LinearProgressIndicator(
-                    progress = { state.analysis.percent.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = Blue,
-                    trackColor = Color(0x22007AFF),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RallyListHeader(state: EditorUiState, viewModel: EditorViewModel) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .clip(RoundedCornerShape(12.dp))
+            .background(SurfaceGlass)
+            .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
+            .padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("回合列表 · ${state.rallies.size}", fontWeight = FontWeight.SemiBold, color = Ink)
-        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            if (state.rallies.size >= 2) {
-                androidx.compose.material3.TextButton(
-                    onClick = { viewModel.onEvent(EditorEvent.MergeAdjacentRallies) },
+        // Prev button
+        val canPrev = selectedIndex != null && selectedIndex > 0
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (canPrev) StudioElevated else Color(0x10FFFFFF))
+                .clickable(enabled = canPrev) { onSelectPrevious() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.ChevronLeft,
+                contentDescription = "上一回合",
+                tint = if (canPrev) Ink else Muted.copy(alpha = 0.35f),
+                modifier = Modifier.size(18.dp),
+            )
+        }
+
+        Spacer(Modifier.width(6.dp))
+
+        // Horizontal Carousel of Rally Pills
+        LazyRow(
+            state = listState,
+            modifier = Modifier.weight(1f),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            itemsIndexed(rallies) { idx, r ->
+                val isSelected = idx == selectedIndex
+                val bg = if (isSelected) Blue.copy(alpha = 0.25f) else Color(0x1AFFFFFF)
+                val borderCol = if (isSelected) Blue else Color(0x22FFFFFF)
+                val textCol = if (isSelected) Color.White else Ink.copy(alpha = 0.85f)
+                val dotCol = if (r.confidence >= 0.7) Green else Amber
+
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(bg)
+                        .border(1.dp, borderCol, RoundedCornerShape(8.dp))
+                        .clickable { onSelectRally(idx) }
+                        .padding(horizontal = 8.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("合并碎片", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(dotCol),
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        text = "#%02d".format(idx + 1),
+                        color = if (isSelected) Blue else textCol,
+                        fontSize = 11.sp,
+                        fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "%.1fs".format(r.durationSec),
+                        color = if (isSelected) Ink else Muted,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
                 }
             }
-            IconButton(
-                onClick = { viewModel.onEvent(EditorEvent.AddRallyAt(state.playheadSec)) },
-                enabled = state.source != null,
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "在播头添加", tint = Blue)
-            }
+        }
+
+        Spacer(Modifier.width(6.dp))
+
+        // Next button
+        val canNext = selectedIndex != null && selectedIndex < rallies.lastIndex
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (canNext) StudioElevated else Color(0x10FFFFFF))
+                .clickable(enabled = canNext) { onSelectNext() },
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "下一回合",
+                tint = if (canNext) Ink else Muted.copy(alpha = 0.35f),
+                modifier = Modifier.size(18.dp),
+            )
         }
     }
 }
 
+/**
+ * Fast Rally Trim Zone:
+ * Provides non-restarting edge nudge buttons, Play Selected, and head/tail sets.
+ */
 @Composable
-private fun RallyListItem(
-    index: Int,
-    rally: icu.yuqiuyijiaren.xiaobai.domain.Rally,
-    selected: Boolean,
-    viewModel: EditorViewModel,
-) {
-    val statusColor = when (rally.reviewStatus) {
-        icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Approved -> icu.yuqiuyijiaren.xiaobai.ui.theme.Green
-        icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Flagged -> Amber
-        icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Rejected -> Color(0xFFFF3B30)
-        icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Normal -> if (rally.confidence < 0.72) Amber else Blue
-    }
-    Card(
-        onClick = { viewModel.onEvent(EditorEvent.SelectRally(index)) },
-        colors = CardDefaults.cardColors(
-            containerColor = if (selected) Color(0x1A007AFF) else Color.White.copy(alpha = 0.9f),
-        ),
-        shape = RoundedCornerShape(12.dp),
+private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) {
+    val rally = state.selectedRally
+    val index = state.selectedRallyIndex
+    var dragAccumulator by remember { mutableFloatStateOf(0f) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(SurfaceGlass)
+            .border(1.dp, BorderSubtle, RoundedCornerShape(14.dp))
+            .pointerInput(state.rallies.size, index) {
+                detectHorizontalDragGestures(
+                    onDragStart = { dragAccumulator = 0f },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        dragAccumulator += dragAmount
+                    },
+                    onDragEnd = {
+                        if (dragAccumulator > 50f) {
+                            viewModel.onEvent(EditorEvent.SelectPrevious)
+                        } else if (dragAccumulator < -50f) {
+                            viewModel.onEvent(EditorEvent.SelectNext)
+                        }
+                        dragAccumulator = 0f
+                    },
+                )
+            }
+            .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(10.dp)
-                    .clip(CircleShape)
-                    .background(statusColor),
-            )
-            Spacer(Modifier.width(10.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "%02d  %s - %s".format(
-                            index + 1,
-                            formatClock(rally.startSec),
-                            formatClock(rally.endSec),
-                        ),
-                        color = Ink,
-                        fontWeight = FontWeight.Medium,
-                    )
-                    if (rally.reviewStatus != icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Normal) {
+        if (rally != null && index != null) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Header of selected rally with direct [◀] [▶] Steppers
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Prev Stepper
+                        val canPrev = index > 0
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(if (canPrev) Color(0x33FFFFFF) else Color(0x0EFFFFFF))
+                                .clickable(enabled = canPrev) {
+                                    viewModel.onEvent(EditorEvent.SelectPrevious)
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Default.ChevronLeft,
+                                contentDescription = "上一回合",
+                                tint = if (canPrev) Ink else Muted.copy(alpha = 0.3f),
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+
                         Spacer(Modifier.width(6.dp))
+
+                        // Round index indicator
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Blue.copy(alpha = 0.2f))
+                                .border(1.dp, Blue.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        ) {
+                            Text(
+                                "第 %02d / %02d 回合".format(index + 1, state.rallies.size),
+                                color = Blue,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+
+                        Spacer(Modifier.width(6.dp))
+
+                        // Next Stepper
+                        val canNext = index < state.rallies.lastIndex
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(if (canNext) Color(0x33FFFFFF) else Color(0x0EFFFFFF))
+                                .clickable(enabled = canNext) {
+                                    viewModel.onEvent(EditorEvent.SelectNext)
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Default.ChevronRight,
+                                contentDescription = "下一回合",
+                                tint = if (canNext) Ink else Muted.copy(alpha = 0.3f),
+                                modifier = Modifier.size(16.dp),
+                            )
+                        }
+
+                        Spacer(Modifier.width(8.dp))
+
                         Text(
-                            when (rally.reviewStatus) {
-                                icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Approved -> "已过"
-                                icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Flagged -> "待查"
-                                icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus.Rejected -> "弃用"
-                                else -> ""
-                            },
-                            color = statusColor,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
+                            "%s - %s (%.1fs)".format(
+                                formatClock(rally.startSec),
+                                formatClock(rally.endSec),
+                                rally.durationSec,
+                            ),
+                            color = Ink,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
                         )
                     }
+
+                    Text(
+                        "置信度 %d%%".format((rally.confidence * 100).roundToInt()),
+                        color = Muted,
+                        fontSize = 10.sp,
+                    )
                 }
+
+                // Main Trim Control Bar: [起点 -0.5s / +0.5s]  [▶ 播本段]  [终点 -0.5s / +0.5s]
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Nudge Start
+                    TrimStepButton("起点 -0.5s", modifier = Modifier.weight(1f)) {
+                        viewModel.onEvent(EditorEvent.NudgeSelectedEdge(startDelta = -0.5))
+                    }
+                    TrimStepButton("起点 +0.5s", modifier = Modifier.weight(1f)) {
+                        viewModel.onEvent(EditorEvent.NudgeSelectedEdge(startDelta = 0.5))
+                    }
+
+                    // Play this rally
+                    Button(
+                        onClick = { viewModel.onEvent(EditorEvent.PlaySelected) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Green),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        modifier = Modifier.height(34.dp),
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(2.dp))
+                        Text("播放", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // Nudge End (Dynamically extends playback if currently playing!)
+                    TrimStepButton("终点 -0.5s", modifier = Modifier.weight(1f)) {
+                        viewModel.onEvent(EditorEvent.NudgeSelectedEdge(endDelta = -0.5))
+                    }
+                    TrimStepButton("终点 +0.5s", modifier = Modifier.weight(1f)) {
+                        viewModel.onEvent(EditorEvent.NudgeSelectedEdge(endDelta = 0.5))
+                    }
+                }
+
+                // Secondary Set at Playhead shortcuts
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    QuickActionButton("以播头设为起点", modifier = Modifier.weight(1f)) {
+                        viewModel.onEvent(EditorEvent.SetSelectedStartAtPlayhead)
+                    }
+                    QuickActionButton("以播头设为终点", modifier = Modifier.weight(1f)) {
+                        viewModel.onEvent(EditorEvent.SetSelectedEndAtPlayhead)
+                    }
+                }
+            }
+        } else {
+            // Hint when no rally is selected
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 12.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
-                    "%.1fs · 置信度 %d%%".format(
-                        rally.durationSec,
-                        (rally.confidence * 100).roundToInt(),
-                    ),
+                    text = if (state.rallies.isEmpty()) "点击识别或下方「+回合」添加对战片段" else "轻触时间轴上的绿色回合块进行精准剪辑",
                     color = Muted,
                     fontSize = 12.sp,
                 )
             }
-            IconButton(onClick = {
-                viewModel.onEvent(EditorEvent.SelectRally(index))
-                viewModel.onEvent(EditorEvent.PlaySelected)
-            }) {
-                Icon(Icons.Default.PlayArrow, contentDescription = "播放本段", tint = Blue)
+        }
+    }
+}
+
+/**
+ * Sticky Bottom Thumb Action Zone (CapCut Style):
+ * 6 thumb-friendly icons for high frequency mobile operation.
+ */
+@Composable
+private fun StickyThumbActionZone(
+    state: EditorUiState,
+    viewModel: EditorViewModel,
+    onOpenRalliesSheet: () -> Unit,
+) {
+    val selectedIndex = state.selectedRallyIndex
+    val canMergeNext = selectedIndex != null && selectedIndex < state.rallies.lastIndex
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(SurfaceGlass)
+            .border(1.dp, BorderSubtle, RoundedCornerShape(0.dp))
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // 1. +回合
+            ThumbActionButton(
+                icon = Icons.Default.Add,
+                label = "+回合",
+                enabled = state.source != null,
+                onClick = { viewModel.onEvent(EditorEvent.AddRallyAt(state.playheadSec)) },
+            )
+
+            // 2. 拆分
+            ThumbActionButton(
+                icon = Icons.Default.ContentCut,
+                label = "拆分",
+                enabled = selectedIndex != null,
+                onClick = { viewModel.onEvent(EditorEvent.SplitSelectedAtPlayhead) },
+            )
+
+            // 3. 删除
+            ThumbActionButton(
+                icon = Icons.Default.Delete,
+                label = "删除",
+                tint = if (selectedIndex != null) Red else Muted,
+                enabled = selectedIndex != null,
+                onClick = { selectedIndex?.let { viewModel.onEvent(EditorEvent.DeleteRally(it)) } },
+            )
+
+            // 4. 合并
+            ThumbActionButton(
+                icon = Icons.Default.CallMerge,
+                label = "合并",
+                enabled = canMergeNext,
+                onClick = { viewModel.onEvent(EditorEvent.MergeSelectedWithNext) },
+            )
+
+            // 5. 回合表
+            ThumbActionButton(
+                icon = Icons.Default.FormatListBulleted,
+                label = "回合表",
+                badge = if (state.rallies.isNotEmpty()) "${state.rallies.size}" else null,
+                onClick = onOpenRalliesSheet,
+            )
+
+            // 6. 导出 (Glowing Primary Button)
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (state.rallies.isNotEmpty() && !state.isExporting) Blue else StudioElevated)
+                    .clickable(enabled = state.rallies.isNotEmpty() && !state.isExporting) {
+                        viewModel.onEvent(EditorEvent.Export)
+                    }
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (state.isExporting) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.IosShare, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("导出", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Bottom Sheet Content for "回合表":
+ * Detailed list of all rallies with status toggle, delete, and confidence score.
+ */
+@Composable
+private fun RalliesBottomSheetContent(
+    state: EditorUiState,
+    viewModel: EditorViewModel,
+    onClose: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "全部回合 (${state.rallies.size})",
+                color = Ink,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.rallies.size >= 2) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(StudioElevated)
+                            .clickable { viewModel.onEvent(EditorEvent.MergeAdjacentRallies) }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                    ) {
+                        Text("合并临近碎片", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+
+                IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "关闭", tint = Muted)
+                }
+            }
+        }
+
+        Spacer(Modifier.height(10.dp))
+
+        if (state.rallies.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("暂无回合，请点击「智能识别」或「+回合」添加", color = Muted, fontSize = 13.sp)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(340.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                itemsIndexed(state.rallies) { index, rally ->
+                    val isSelected = state.selectedRallyIndex == index
+                    RallySheetItem(
+                        index = index,
+                        rally = rally,
+                        isSelected = isSelected,
+                        onSelect = {
+                            viewModel.onEvent(EditorEvent.SelectRally(index))
+                            viewModel.onEvent(EditorEvent.PlaySelected)
+                        },
+                        onDelete = {
+                            viewModel.onEvent(EditorEvent.DeleteRally(index))
+                        },
+                        onSetStatus = { status ->
+                            viewModel.onEvent(EditorEvent.SetRallyStatus(index, status))
+                        },
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ExportButton(
-    state: EditorUiState,
-    viewModel: EditorViewModel,
-    modifier: Modifier = Modifier,
+private fun RallySheetItem(
+    index: Int,
+    rally: Rally,
+    isSelected: Boolean,
+    onSelect: () -> Unit,
+    onDelete: () -> Unit,
+    onSetStatus: (ReviewStatus) -> Unit,
 ) {
-    Button(
-        onClick = { viewModel.onEvent(EditorEvent.Export) },
-        enabled = state.rallies.isNotEmpty() && !state.isExporting && !state.isAnalyzing,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = Blue),
+    val statusColor = when (rally.reviewStatus) {
+        ReviewStatus.Approved -> Green
+        ReviewStatus.Flagged -> Amber
+        ReviewStatus.Rejected -> Red
+        ReviewStatus.Normal -> Blue
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isSelected) StudioElevated else Canvas)
+            .border(1.dp, if (isSelected) Blue else BorderSubtle, RoundedCornerShape(10.dp))
+            .padding(10.dp),
     ) {
-        if (state.isExporting) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(18.dp),
-                color = Color.White,
-                strokeWidth = 2.dp,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text("正在导出并保存…")
-        } else {
-            Icon(Icons.Default.IosShare, contentDescription = null)
-            Spacer(Modifier.width(8.dp))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(statusColor),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "%02d  %s - %s".format(index + 1, formatClock(rally.startSec), formatClock(rally.endSec)),
+                        color = Ink,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        "%.1fs".format(rally.durationSec),
+                        color = Muted,
+                        fontSize = 12.sp,
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(StudioElevated)
+                            .clickable { onSelect() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Blue, modifier = Modifier.size(16.dp))
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(StudioElevated)
+                            .clickable { onDelete() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = null, tint = Red, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+
+            // Review status chips
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                StatusTag("正常", rally.reviewStatus == ReviewStatus.Normal, Blue) { onSetStatus(ReviewStatus.Normal) }
+                StatusTag("已通过", rally.reviewStatus == ReviewStatus.Approved, Green) { onSetStatus(ReviewStatus.Approved) }
+                StatusTag("待复核", rally.reviewStatus == ReviewStatus.Flagged, Amber) { onSetStatus(ReviewStatus.Flagged) }
+                StatusTag("弃用", rally.reviewStatus == ReviewStatus.Rejected, Red) { onSetStatus(ReviewStatus.Rejected) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusTag(label: String, selected: Boolean, color: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (selected) color.copy(alpha = 0.2f) else StudioElevated)
+            .border(1.dp, if (selected) color else Color.Transparent, RoundedCornerShape(6.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = 2.dp),
+    ) {
+        Text(
+            label,
+            color = if (selected) color else Muted,
+            fontSize = 10.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        )
+    }
+}
+
+/**
+ * Thumb Action Item (Icon + label)
+ */
+@Composable
+private fun ThumbActionButton(
+    icon: ImageVector,
+    label: String,
+    enabled: Boolean = true,
+    tint: Color = Ink,
+    badge: String? = null,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(enabled = enabled) { onClick() }
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Box {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = if (enabled) tint else Muted.copy(alpha = 0.4f),
+                    modifier = Modifier.size(20.dp),
+                )
+                if (badge != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .offset(x = 6.dp, y = (-4).dp)
+                            .clip(CircleShape)
+                            .background(Blue)
+                            .padding(horizontal = 4.dp, vertical = 1.dp),
+                    ) {
+                        Text(badge, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+            Spacer(Modifier.height(2.dp))
             Text(
-                if (state.rallies.isEmpty()) {
-                    "导出合并视频到相册"
-                } else {
-                    "导出到相册 · ${state.rallies.size} 段"
-                },
+                text = label,
+                color = if (enabled) Ink else Muted.copy(alpha = 0.4f),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
             )
         }
     }
 }
 
 @Composable
-private fun MetricChip(label: String, value: String) {
+private fun TrimStepButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .height(34.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(StudioElevated)
+            .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun QuickActionButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .height(28.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(StudioElevated.copy(alpha = 0.6f))
+            .border(1.dp, BorderSubtle, RoundedCornerShape(6.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(label, color = Muted, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun MetricPill(
+    label: String,
+    value: String,
+    highlight: Color? = null,
+    modifier: Modifier = Modifier,
+) {
     Column(
-        modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(Color.White.copy(alpha = 0.85f))
-            .border(1.dp, Color(0x1F767680), RoundedCornerShape(10.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(SurfaceGlass)
+            .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(label, color = Muted, fontSize = 10.sp)
-        Text(value, color = Ink, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Text(
+            value,
+            color = highlight ?: Ink,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+        )
     }
 }
 
@@ -756,15 +1436,22 @@ private fun shareExportedVideo(context: android.content.Context, path: String): 
 private fun readVideoSource(context: android.content.Context, uri: Uri): VideoSource? {
     return try {
         var name = "video.mp4"
-        context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (cursor.moveToFirst() && index >= 0) {
-                name = cursor.getString(index) ?: name
+        try {
+            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst() && index >= 0) {
+                    name = cursor.getString(index) ?: name
+                }
             }
+        } catch (_: Exception) {
+        }
+        if (name == "video.mp4" && uri.path != null) {
+            val f = java.io.File(uri.path!!)
+            if (f.exists()) name = f.name
         }
         val retriever = MediaMetadataRetriever()
         try {
-            retriever.setDataSource(context, uri)
+            icu.yuqiuyijiaren.xiaobai.domain.MediaSourceHelper.setRetrieverDataSource(retriever, context, uri)
             val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
                 ?.toLongOrNull()
                 ?: 0L
@@ -781,3 +1468,4 @@ private fun readVideoSource(context: android.content.Context, uri: Uri): VideoSo
         null
     }
 }
+

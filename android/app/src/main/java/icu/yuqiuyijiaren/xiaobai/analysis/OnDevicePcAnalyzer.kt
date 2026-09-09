@@ -61,12 +61,15 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
             )
 
             emit(progress(AnalysisPhase.ExtractingAudio, 0.08f, "解码音轨并检测击球（${config.tier.label}）"))
+            android.util.Log.i("Xiaobai", "Starting audioHits.detect for uri=$uri")
             val hitResult = try {
                 audioHits.detect(context, uri)
             } catch (error: OutOfMemoryError) {
+                android.util.Log.e("Xiaobai", "Audio detection OOM", error)
                 emit(AnalysisUpdate.Error("内存不足，请改用「快速」档或缩短视频后重试"))
                 return@flow
             } catch (error: Exception) {
+                android.util.Log.e("Xiaobai", "Audio detection failed", error)
                 emit(
                     AnalysisUpdate.Error(
                         error.message?.takeIf { it.isNotBlank() }
@@ -75,6 +78,7 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
                 )
                 return@flow
             }
+            android.util.Log.i("Xiaobai", "Audio hits detected: count=${hitResult.hitsSec.size}")
             if (hitResult.hitsSec.isEmpty()) {
                 warnings += "未检测到击球峰值，请检查音轨或手动标注"
             }
@@ -95,16 +99,21 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
                 courtRoi = request.courtRoi.asPairs(),
             )
             val motion = try {
+                android.util.Log.i("Xiaobai", "Starting motionExtractor.extract motionFps=$motionFps, motionCap=$motionCap")
                 motionExtractor.extract(context, uri, source.durationSec, onProgress = null)
-            } catch (_: OutOfMemoryError) {
+            } catch (error: OutOfMemoryError) {
+                android.util.Log.e("Xiaobai", "Motion extraction OOM", error)
                 warnings += "运动分析内存不足，已退化为仅音频"
                 null
-            } catch (_: Exception) {
+            } catch (error: Exception) {
+                android.util.Log.e("Xiaobai", "Motion extraction failed", error)
                 null
             }
             if (motion == null || motion.isEmpty) {
+                android.util.Log.w("Xiaobai", "Motion extraction empty or null")
                 warnings += "球场运动提取失败/为空，已退化为仅音频分组"
             } else {
+                android.util.Log.i("Xiaobai", "Motion extracted: timestamps=${motion.timestamps.size}")
                 emit(
                     progress(
                         AnalysisPhase.DetectingHits,
@@ -116,12 +125,14 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
 
             emit(progress(AnalysisPhase.BuildingRallies, 0.78f, "组装回合并应用高光过滤"))
             val coarse = builder.build(hitResult.hitsSec, motion)
+            android.util.Log.i("Xiaobai", "Coarse rallies built: count=${coarse.size}")
             val filtered = highlightFilter.apply(coarse, hitResult.hitsSec, motion)
             val refined = if (config.doubleHighlightPass) {
                 highlightFilter.apply(filtered, hitResult.hitsSec, motion)
             } else {
                 filtered
             }
+            android.util.Log.i("Xiaobai", "Refined rallies: count=${refined.size}")
 
             val duration = source.durationSec
             val baseId = System.currentTimeMillis()
@@ -136,6 +147,7 @@ class OnDevicePcAnalyzer : RallyAnalyzer {
                     ).clamp(duration)
                 }
                 .filter { it.durationSec >= 0.5 }
+            android.util.Log.i("Xiaobai", "Final rallies: count=${rallies.size}")
 
             val doneMsg = when {
                 rallies.isEmpty() -> "未识别到有效回合，可用「打点」或手动添加"

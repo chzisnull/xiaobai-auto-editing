@@ -81,9 +81,12 @@ class EditorViewModel(
                     courtRoi = CourtRoi.DEFAULT,
                 )
             }
-            EditorEvent.StartAnalysis -> startAnalysis()
+            EditorEvent.StartAnalysis -> {
+                android.util.Log.i("Xiaobai", "EditorEvent.StartAnalysis received! source=${_uiState.value.source?.displayName}, isAnalyzing=${_uiState.value.isAnalyzing}")
+                startAnalysis()
+            }
             EditorEvent.CancelAnalysis -> cancelAnalysis()
-            is EditorEvent.SelectRally -> _uiState.update { it.copy(selectedRallyIndex = event.index) }
+            is EditorEvent.SelectRally -> selectRally(event.index)
             is EditorEvent.UpdateRally -> updateRally(event.index, event.startSec, event.endSec)
             is EditorEvent.DeleteRally -> deleteRally(event.index)
             is EditorEvent.AddRallyAt -> addRally(event.timeSec)
@@ -199,11 +202,14 @@ class EditorViewModel(
     }
 
     private fun startAnalysis() {
-        val source = _uiState.value.source ?: return
+        val source = _uiState.value.source
+        android.util.Log.i("Xiaobai", "startAnalysis entry: source=$source, isAnalyzing=${_uiState.value.isAnalyzing}")
+        if (source == null) return
         if (_uiState.value.isAnalyzing) return
         val token = sessionToken
         val roi = _uiState.value.courtRoi
         val config = analysisConfig
+        android.util.Log.i("Xiaobai", "startAnalysis launching job for token=$token, config=$config")
         analysisJob?.cancel()
         analysisJob = viewModelScope.launch {
             _uiState.update {
@@ -369,11 +375,26 @@ class EditorViewModel(
         _uiState.update { state ->
             val rally = state.rallies[index]
             val next = state.rallies.toMutableList()
-            next[index] = rally.copy(
-                startSec = rally.startSec + startDelta,
-                endSec = rally.endSec + endDelta,
+            val updatedRally = rally.copy(
+                startSec = (rally.startSec + startDelta).coerceAtLeast(0.0),
+                endSec = (rally.endSec + endDelta).coerceAtMost(duration),
             ).clamp(duration)
-            state.copy(rallies = next)
+            next[index] = updatedRally
+
+            val currentPlayback = state.playback
+            val nextPlayback = if (currentPlayback != null && endDelta > 0) {
+                playbackToken += 1L
+                currentPlayback.copy(
+                    token = playbackToken,
+                    seekSec = state.playheadSec,
+                    playUntilSec = updatedRally.endSec,
+                    autoPlay = true,
+                )
+            } else {
+                currentPlayback
+            }
+
+            state.copy(rallies = next, playback = nextPlayback)
         }
     }
 
@@ -517,16 +538,16 @@ class EditorViewModel(
         }
     }
 
-    private fun selectRelative(delta: Int) {
-        val state = _uiState.value
-        if (state.rallies.isEmpty()) return
-        val current = state.selectedRallyIndex ?: if (delta > 0) -1 else state.rallies.size
-        val next = (current + delta).coerceIn(0, state.rallies.lastIndex)
-        val rally = state.rallies[next]
+    private fun selectRally(index: Int?) {
+        if (index == null || index !in _uiState.value.rallies.indices) {
+            _uiState.update { it.copy(selectedRallyIndex = null) }
+            return
+        }
+        val rally = _uiState.value.rallies[index]
         playbackToken += 1L
         _uiState.update {
             it.copy(
-                selectedRallyIndex = next,
+                selectedRallyIndex = index,
                 playheadSec = rally.startSec,
                 playback = PlaybackCommand(
                     token = playbackToken,
@@ -535,6 +556,14 @@ class EditorViewModel(
                 ),
             )
         }
+    }
+
+    private fun selectRelative(delta: Int) {
+        val state = _uiState.value
+        if (state.rallies.isEmpty()) return
+        val current = state.selectedRallyIndex ?: if (delta > 0) -1 else state.rallies.size
+        val next = (current + delta).coerceIn(0, state.rallies.lastIndex)
+        selectRally(next)
     }
 
     private fun updateRoiPoint(index: Int, x: Float, y: Float) {

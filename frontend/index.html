@@ -2,899 +2,1491 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#f5f5f7">
-  <title>小白自动剪辑</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#0e0e11">
+  <title>小白自动剪辑 · 智能羽毛球剪辑工作台</title>
   <script src="./vendor/lucide.min.js"></script>
   <style>
     :root {
-      color-scheme: light;
-      --ink: #1d1d1f;
-      --muted: #6e6e73;
-      --line: rgba(60, 60, 67, 0.16);
-      --line-strong: rgba(60, 60, 67, 0.28);
-      --surface: rgba(255, 255, 255, 0.78);
-      --surface-soft: rgba(118, 118, 128, 0.09);
-      --canvas: #f2f2f7;
-      --stage: #111113;
-      --green: #34c759;
-      --green-strong: #248a3d;
-      --green-soft: rgba(52, 199, 89, 0.12);
-      --blue: #007aff;
-      --blue-strong: #0062cc;
-      --amber: #a05a00;
-      --danger: #ff3b30;
-      --shadow: 0 18px 50px rgba(0, 0, 0, 0.09);
-      --radius: 8px;
+      color-scheme: dark;
+      --bg: #0b0b0e;
+      --surface: #15151b;
+      --surface-elevated: #1c1c24;
+      --surface-glass: rgba(26, 26, 35, 0.88);
+      --border: rgba(255, 255, 255, 0.10);
+      --border-subtle: rgba(255, 255, 255, 0.05);
+      --text: #f5f5f7;
+      --text-muted: #8e8e96;
+      --primary: #0a84ff;
+      --primary-gradient: linear-gradient(135deg, #0a84ff 0%, #0056cc 100%);
+      --accent-green: #30d158;
+      --accent-green-glass: rgba(48, 209, 88, 0.22);
+      --accent-amber: #ff9f0a;
+      --accent-amber-glass: rgba(255, 159, 10, 0.22);
+      --accent-red: #ff453a;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 18px;
+      --shadow-sheet: 0 -12px 40px rgba(0, 0, 0, 0.65);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
 
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-    html { min-width: 320px; background: var(--canvas); }
-
-    body {
+    html, body {
       margin: 0;
-      min-height: 100vh;
-      color: var(--ink);
-      background: var(--canvas);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
       font-size: 14px;
-      letter-spacing: 0;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
-    button, input, select { font: inherit; letter-spacing: 0; }
-    button, label[for="videoInput"] { -webkit-tap-highlight-color: transparent; }
-    button:focus-visible, input:focus-visible, select:focus-visible, label[for="videoInput"]:focus-visible {
-      outline: 3px solid rgba(0, 122, 255, 0.24);
-      outline-offset: 2px;
+    button, input, select {
+      font: inherit;
+      color: inherit;
+      border: none;
+      outline: none;
+      background: none;
     }
 
+    /* App Shell Container */
+    .app-root {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 1200px;
+      margin: 0 auto;
+      height: 100vh;
+      height: 100dvh;
+      position: relative;
+      background: var(--bg);
+    }
+
+    /* Top Compact Header */
     .app-header {
-      position: sticky;
-      top: 0;
-      z-index: 30;
-      height: 64px;
-      padding: 0 24px;
+      height: 48px;
+      padding: 0 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      color: var(--ink);
-      background: rgba(250, 250, 252, 0.78);
-      border-bottom: 1px solid var(--line);
-      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
-      -webkit-backdrop-filter: saturate(180%) blur(22px);
-      backdrop-filter: saturate(180%) blur(22px);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex: 0 0 48px;
+      z-index: 20;
     }
 
-    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
-    .brand-mark {
-      width: 34px;
-      height: 34px;
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: var(--primary-gradient);
       display: grid;
       place-items: center;
-      flex: 0 0 auto;
       color: #fff;
-      background: var(--blue);
-      border-radius: 7px;
-      box-shadow: 0 4px 12px rgba(0, 122, 255, 0.2);
-    }
-    .brand-mark svg { width: 19px; height: 19px; }
-    .brand-name { font-size: 16px; font-weight: 680; line-height: 1.15; }
-    .brand-subtitle { margin-top: 2px; color: var(--muted); font-size: 11px; }
-
-    .api-state { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
-    .api-dot { width: 8px; height: 8px; border-radius: 50%; background: #8e8e93; }
-    .api-state.online .api-dot { background: var(--green); box-shadow: 0 0 0 4px rgba(52, 199, 89, 0.12); }
-    .api-state.offline .api-dot { background: var(--danger); }
-
-    .workspace {
-      min-height: calc(100vh - 104px);
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 360px;
-      max-width: 1600px;
-      width: calc(100% - 40px);
-      margin: 20px auto;
-      background: var(--surface);
-      border: 1px solid rgba(255, 255, 255, 0.82);
-      border-radius: var(--radius);
-      box-shadow: var(--shadow);
-      overflow: clip;
-      -webkit-backdrop-filter: saturate(150%) blur(28px);
-      backdrop-filter: saturate(150%) blur(28px);
     }
 
-    .editor {
-      min-width: 0;
-      padding: 24px 28px 36px;
-      border-right: 1px solid var(--line);
-      background: rgba(255, 255, 255, 0.34);
+    .brand-icon svg { width: 16px; height: 16px; }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.2px;
     }
 
-    .source-bar {
-      min-height: 48px;
-      margin-bottom: 16px;
+    .header-actions {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 16px;
+      gap: 10px;
     }
 
-    .source-meta { min-width: 0; }
-    .source-name {
-      max-width: min(58vw, 760px);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: 15px;
-      font-weight: 680;
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.06);
+      padding: 4px 8px;
+      border-radius: 20px;
     }
-    .source-detail { margin-top: 4px; color: var(--muted); font-size: 12px; }
-    .source-actions { display: flex; align-items: center; gap: 8px; }
 
-    .button {
-      min-height: 44px;
-      border: 0;
-      border-radius: 7px;
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #636366;
+    }
+    .status-pill.online .status-dot { background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+    .status-pill.offline .status-dot { background: var(--accent-red); }
+
+    .header-btn {
       display: inline-flex;
       align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 0 14px;
-      font-weight: 620;
+      gap: 4px;
+      padding: 5px 10px;
+      border-radius: 16px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      font-size: 12px;
+      font-weight: 500;
       cursor: pointer;
-      transition: background-color 200ms ease, color 200ms ease, transform 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+      transition: all 0.15s ease;
     }
-    .button:hover { transform: translateY(-1px); }
-    .button:active { transform: translateY(0); }
-    .button:disabled { cursor: not-allowed; opacity: 0.48; transform: none; }
-    .button svg { width: 17px; height: 17px; }
-    .button-primary { color: #fff; background: var(--blue); box-shadow: 0 5px 14px rgba(0, 122, 255, 0.18); }
-    .button-primary:hover { background: var(--blue-strong); box-shadow: 0 7px 18px rgba(0, 122, 255, 0.23); }
-    .button-secondary { color: var(--ink); background: rgba(255, 255, 255, 0.7); border: 1px solid var(--line); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03); }
-    .button-secondary:hover { background: rgba(255, 255, 255, 0.96); border-color: var(--line-strong); }
-    .button-quiet { min-height: 44px; padding: 0 10px; color: var(--muted); background: transparent; }
-    .button-quiet:hover { color: var(--ink); background: var(--surface-soft); }
-    .button-icon { width: 44px; height: 44px; min-height: 44px; padding: 0; }
-    .button-danger:hover { color: var(--danger); background: rgba(255, 59, 48, 0.09); }
-    .button-toggle.active {
-      color: #fff !important;
-      background: var(--blue) !important;
-      box-shadow: 0 2px 8px rgba(0, 122, 255, 0.35);
-    }
-    .button-toggle.active svg { color: #fff !important; }
+    .header-btn:active { transform: scale(0.96); background: rgba(255, 255, 255, 0.12); }
+    .header-btn svg { width: 14px; height: 14px; }
 
+    /* Middle Work Area: Video + Timeline */
+    .app-workspace {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Custom Video Player Stage */
     .video-stage {
       position: relative;
       width: 100%;
+      background: #000;
       aspect-ratio: 16 / 9;
-      min-height: 260px;
+      max-height: 48vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
       overflow: hidden;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: #000;
+    }
+
+    /* Player Gesture Layer */
+    .player-gesture-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 5;
+      display: flex;
+    }
+
+    .gesture-side {
+      flex: 1;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Center Feedback Bubble */
+    .center-feedback {
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
       display: grid;
       place-items: center;
       color: #fff;
-      background: var(--stage);
-      border-radius: var(--radius);
-      border: 1px solid rgba(0, 0, 0, 0.42);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
+      pointer-events: none;
+      opacity: 0;
+      transform: scale(0.7);
+      transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      z-index: 12;
     }
-    .video-stage.dragging { box-shadow: inset 0 0 0 3px var(--blue), 0 12px 28px rgba(0, 0, 0, 0.16); }
-    .video-stage video { width: 100%; height: 100%; object-fit: contain; background: #050506; }
+    .center-feedback.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .center-feedback svg { width: 28px; height: 28px; }
 
-    .court-overlay {
+    /* HUD Top Bar */
+    .hud-top {
       position: absolute;
-      z-index: 6;
-      display: none;
-      overflow: visible;
-      touch-action: none;
-    }
-    .court-overlay.visible { display: block; }
-    .court-area { fill: rgba(0, 122, 255, 0.16); stroke: #64d2ff; stroke-width: 5; vector-effect: non-scaling-stroke; }
-    .court-handle-hit { fill: transparent; cursor: grab; }
-    .court-handle { fill: #fff; stroke: var(--blue); stroke-width: 5; vector-effect: non-scaling-stroke; pointer-events: none; }
-    .court-tools {
-      position: absolute;
-      inset: auto 12px 12px;
-      z-index: 7;
-      min-height: 44px;
-      display: none;
+      top: 0;
+      left: 0;
+      right: 0;
+      padding: 8px 12px;
+      display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 6px 7px 6px 12px;
-      color: #eef8f2;
-      background: rgba(28, 28, 30, 0.82);
-      border: 1px solid rgba(255, 255, 255, 0.16);
-      border-radius: 7px;
-      -webkit-backdrop-filter: saturate(160%) blur(18px);
-      backdrop-filter: saturate(160%) blur(18px);
+      background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+      z-index: 10;
+      transition: opacity 0.25s ease;
+      pointer-events: auto;
     }
-    .court-tools.visible { display: flex; animation: enter 180ms ease both; }
-    .court-tools-label { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12px; font-weight: 650; }
-    .court-tools-label svg { width: 16px; height: 16px; color: #64d2ff; }
-    .court-tool-actions { display: flex; gap: 5px; }
-    .court-tools .button-quiet { color: #c4d0c9; }
-    .court-tools .button-quiet:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
-    .court-tools .button-primary { min-height: 44px; }
 
-    .empty-source {
+    .hud-video-name {
+      font-size: 11px;
+      color: rgba(255, 255, 255, 0.85);
+      max-width: 50%;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      background: rgba(0, 0, 0, 0.4);
+      padding: 3px 8px;
+      border-radius: 6px;
+      backdrop-filter: blur(4px);
+    }
+
+    .hud-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hud-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      background: rgba(0, 0, 0, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+    }
+    .hud-chip.active {
+      background: var(--primary);
+      border-color: transparent;
+    }
+    .hud-chip svg { width: 13px; height: 13px; }
+
+    /* HUD Bottom Controls */
+    .hud-bottom {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 6px 12px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0) 100%);
+      z-index: 10;
+      transition: opacity 0.25s ease;
+      pointer-events: auto;
+    }
+
+    .hud-hidden {
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+
+    /* In-player Mini Scrubber */
+    .mini-scrub-box {
+      width: 100%;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .mini-scrub-track {
+      width: 100%;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.22);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .mini-scrub-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--primary);
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+
+    .mini-scrub-rallies {
       position: absolute;
       inset: 0;
-      display: grid;
-      place-items: center;
-      padding: 24px;
-      background: #111113;
+      pointer-events: none;
     }
-    .empty-source.hidden { display: none; }
-    .empty-source-inner { text-align: center; animation: enter 420ms ease both; }
-    .empty-icon {
-      width: 54px;
-      height: 54px;
-      margin: 0 auto 16px;
-      display: grid;
-      place-items: center;
-      color: #64d2ff;
-      background: #1c1c1e;
-      border: 1px solid #3a3a3c;
-      border-radius: 8px;
-    }
-    .empty-icon svg { width: 27px; height: 27px; }
-    .empty-title { margin: 0 0 6px; font-size: 18px; font-weight: 720; }
-    .empty-copy { margin: 0 0 18px; color: #a1a1a6; font-size: 12px; }
-    .file-label { cursor: pointer; }
 
-    .task-banner {
-      min-height: 40px;
-      margin-top: 12px;
-      padding: 0 12px;
+    .mini-rally-mark {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      background: var(--accent-green);
+      opacity: 0.85;
+      border-radius: 1px;
+    }
+    .mini-rally-mark.low-conf {
+      background: var(--accent-amber);
+    }
+
+    /* HUD Row Controls */
+    .hud-controls-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hud-icon-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      cursor: pointer;
+    }
+    .hud-icon-btn:active { transform: scale(0.92); }
+    .hud-icon-btn svg { width: 17px; height: 17px; }
+
+    .hud-time-readout {
+      font-size: 11px;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255, 255, 255, 0.9);
+      font-weight: 500;
+    }
+
+    .hud-spacer { flex: 1; }
+
+    .hud-pill-btn {
+      padding: 3px 7px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .hud-pill-btn:active { background: rgba(255, 255, 255, 0.25); }
+
+    /* Speed Picker Dropdown */
+    .speed-picker {
+      position: relative;
+    }
+    .speed-menu {
+      position: absolute;
+      bottom: 125%;
+      right: 0;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 4px;
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      z-index: 30;
+      min-width: 60px;
+    }
+    .speed-menu.open { display: flex; }
+    .speed-opt {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .speed-opt.active { background: var(--primary); color: #fff; }
+
+    /* Court Calibration Overlay */
+    .court-overlay {
+      position: absolute;
+      pointer-events: none;
+      z-index: 15;
+      display: none;
+    }
+    .court-overlay.visible { display: block; pointer-events: auto; }
+    .court-polygon {
+      fill: rgba(10, 132, 255, 0.18);
+      stroke: var(--primary);
+      stroke-width: 2.5;
+      stroke-dasharray: 6 4;
+    }
+    .court-handle-hit {
+      fill: transparent;
+      cursor: grab;
+    }
+    .court-handle {
+      fill: #fff;
+      stroke: var(--primary);
+      stroke-width: 3.5;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+      cursor: grab;
+    }
+
+    .court-tools-bar {
+      position: absolute;
+      bottom: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(20, 20, 28, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 6px 12px;
       display: none;
       align-items: center;
       gap: 10px;
-      color: var(--blue);
-      background: rgba(0, 122, 255, 0.09);
-      border-left: 3px solid var(--blue);
-      border-radius: 4px;
+      z-index: 18;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 30px rgba(0,0,0,0.6);
     }
-    .task-banner.visible { display: flex; animation: enter 220ms ease both; }
-    .task-banner.error { color: #d70015; background: rgba(255, 59, 48, 0.09); border-left-color: var(--danger); }
-    .task-banner.success { color: var(--green-strong); background: var(--green-soft); border-left-color: var(--green); }
-    .task-banner svg { width: 16px; height: 16px; flex: 0 0 auto; }
-    .task-banner .spin { animation: spin 900ms linear infinite; }
-    .task-banner-text { min-width: 0; flex: 1; font-size: 12px; }
-    .progress-track { width: 120px; height: 4px; overflow: hidden; background: rgba(0, 122, 255, 0.14); border-radius: 2px; }
-    .progress-fill { width: 0; height: 100%; background: currentColor; transition: width 160ms ease; }
-    .progress-track.indeterminate .progress-fill { width: 42%; animation: indeterminate 1.25s ease-in-out infinite; }
+    .court-tools-bar.visible { display: flex; }
+    .court-tools-bar span { font-size: 12px; color: var(--text-muted); }
+    .court-bar-btn {
+      padding: 5px 12px;
+      border-radius: 16px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .court-bar-btn.primary { background: var(--primary); color: #fff; }
+    .court-bar-btn.secondary { background: rgba(255, 255, 255, 0.12); color: #fff; }
 
-    .timeline-section { margin-top: 26px; }
-    .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 16px; margin-bottom: 12px; }
-    .section-heading h2 { margin: 0; font-size: 15px; font-weight: 720; }
-    .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
-    .timeline-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+    /* Empty State View */
+    .empty-stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at center, #1b1b26 0%, #0d0d12 100%);
+      gap: 12px;
+      z-index: 8;
+      padding: 20px;
+      text-align: center;
+    }
+    .empty-stage.hidden { display: none; }
+    .empty-icon-wrap {
+      width: 54px;
+      height: 54px;
+      border-radius: 16px;
+      background: rgba(10, 132, 255, 0.12);
+      border: 1px solid rgba(10, 132, 255, 0.3);
+      display: grid;
+      place-items: center;
+      color: var(--primary);
+    }
+    .empty-icon-wrap svg { width: 28px; height: 28px; }
+    .empty-text-title { font-size: 16px; font-weight: 600; }
+    .empty-text-desc { font-size: 12px; color: var(--text-muted); }
+    .empty-upload-btn {
+      margin-top: 4px;
+      padding: 9px 20px;
+      background: var(--primary-gradient);
+      border-radius: 20px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      box-shadow: 0 4px 16px rgba(10, 132, 255, 0.35);
+    }
+    .empty-upload-btn:active { transform: scale(0.97); }
+
+    /* Task Processing Toast / Banner */
+    .task-banner {
+      height: 34px;
+      background: var(--surface-elevated);
+      border-bottom: 1px solid var(--border);
+      padding: 0 14px;
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--text-muted);
+      flex: 0 0 34px;
+      z-index: 10;
+    }
+    .task-banner.visible { display: flex; }
+    .task-banner.working { color: var(--primary); }
+    .task-banner.success { color: var(--accent-green); }
+    .task-banner.error { color: var(--accent-red); }
+    .task-banner-left { display: flex; align-items: center; gap: 6px; }
+    .task-banner-left svg { width: 14px; height: 14px; }
+    .task-progress-mini {
+      width: 70px;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+    }
+    .task-progress-fill {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 0.2s linear;
+    }
+    .task-progress-mini.indeterminate .task-progress-fill {
+      width: 40%;
+      position: absolute;
+      animation: indeterminate 1.2s infinite ease-in-out;
+    }
+    @keyframes indeterminate {
+      0% { left: -40%; }
+      100% { left: 100%; }
+    }
+
+    /* Section: Tactile Mobile Timeline */
+    .timeline-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      min-height: 120px;
+      position: relative;
+      overflow: hidden;
+    }
 
     .timeline-toolbar {
+      height: 32px;
+      padding: 0 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      margin: 0 0 10px;
-      flex-wrap: wrap;
-    }
-    .timeline-tools {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px;
-      background: rgba(118, 118, 128, 0.12);
-      border-radius: 8px;
-    }
-    .timeline-tools .button-icon {
-      width: 30px;
-      height: 30px;
-      border-radius: 6px;
-    }
-    .timeline-zoom-label {
-      min-width: 52px;
-      text-align: center;
-      color: var(--muted);
+      border-bottom: 1px solid var(--border-subtle);
       font-size: 11px;
-      font-variant-numeric: tabular-nums;
-      font-weight: 600;
-    }
-    .timeline-legend {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      color: var(--muted);
-      font-size: 11px;
-    }
-    .legend-item { display: inline-flex; align-items: center; gap: 6px; }
-    .legend-swatch {
-      width: 12px;
-      height: 12px;
-      border-radius: 3px;
-      border: 1px solid transparent;
-    }
-    .legend-swatch.normal { background: var(--blue); border-color: var(--blue-strong); }
-    .legend-swatch.low { background: #ff9f0a; border-color: #c77700; }
-    .timeline-range-label {
-      color: var(--muted);
-      font-size: 11px;
-      font-variant-numeric: tabular-nums;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.02);
+      flex: 0 0 32px;
     }
 
-    .timeline-shell {
-      position: relative;
-      height: 118px;
-      padding: 10px 0 8px;
-      background: linear-gradient(180deg, rgba(255,255,255,0.55), rgba(118, 118, 128, 0.08));
-      border: 1px solid var(--line);
-      border-radius: 10px;
-      user-select: none;
-      overflow: hidden;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.65);
+    .active-rally-tag {
+      font-weight: 600;
+      color: var(--accent-green);
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
+    .active-rally-tag.amber { color: var(--accent-amber); }
+    .active-rally-tag.empty { color: var(--text-muted); font-weight: normal; }
+
+    .zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .zoom-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .zoom-btn:active { background: rgba(255, 255, 255, 0.15); }
+    .zoom-btn svg { width: 13px; height: 13px; }
+
+    /* Timeline Scrollable Viewport */
     .timeline-viewport {
-      position: relative;
-      height: 100%;
+      flex: 1;
+      width: 100%;
       overflow-x: auto;
       overflow-y: hidden;
-      padding: 0 12px 4px;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(60, 60, 67, 0.35) transparent;
-      cursor: grab;
+      position: relative;
+      background: #111116;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
       touch-action: pan-x;
     }
-    .timeline-viewport.is-panning { cursor: grabbing; }
-    .timeline-viewport::-webkit-scrollbar { height: 8px; }
-    .timeline-viewport::-webkit-scrollbar-thumb {
-      background: rgba(60, 60, 67, 0.28);
-      border-radius: 999px;
-    }
+    .timeline-viewport::-webkit-scrollbar { display: none; }
+
     .timeline-canvas {
       position: relative;
       height: 100%;
       min-width: 100%;
-      width: 100%;
-    }
-    .timeline-track {
-      position: relative;
-      height: 52px;
-      margin-top: 8px;
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.35), rgba(118, 118, 128, 0.14)),
-        repeating-linear-gradient(
-          90deg,
-          rgba(60, 60, 67, 0.05) 0,
-          rgba(60, 60, 67, 0.05) 1px,
-          transparent 1px,
-          transparent 24px
-        );
-      border: 1px solid rgba(60, 60, 67, 0.12);
-      border-radius: 8px;
-      overflow: visible;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.5);
-    }
-    .timeline-progress {
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      left: 0;
-      width: 2px;
-      pointer-events: none;
-      background: linear-gradient(180deg, #1d1d1f, rgba(29, 29, 31, 0.75));
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.35);
-      z-index: 5;
-      transform: translateX(-1px);
-    }
-    .timeline-progress::before {
-      content: "";
-      position: absolute;
-      top: -5px;
-      left: 50%;
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background: #1d1d1f;
-      border: 2px solid #fff;
-      transform: translateX(-50%);
-      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-    }
-    .segment {
-      position: absolute;
-      top: 8px;
-      height: 36px;
-      min-width: 6px;
-      cursor: grab;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      background: linear-gradient(180deg, #3d9bff, var(--blue));
-      border: 1px solid var(--blue-strong);
-      border-radius: 6px;
-      z-index: 2;
-      box-shadow: 0 2px 8px rgba(0, 122, 255, 0.18);
-      transition: filter 120ms ease, box-shadow 120ms ease, transform 80ms ease;
-    }
-    .segment:hover, .segment.active {
-      filter: brightness(1.05);
-      box-shadow: 0 4px 14px rgba(0, 122, 255, 0.32);
-      z-index: 3;
-      transform: translateY(-1px);
-    }
-    .segment.selected {
-      outline: 2px solid rgba(29, 29, 31, 0.85);
-      outline-offset: 1px;
-      z-index: 4;
-    }
-    .segment.low-confidence {
-      background: linear-gradient(180deg, #ffb340, #ff9f0a);
-      border-color: #c77700;
-      box-shadow: 0 2px 8px rgba(255, 159, 10, 0.22);
-    }
-    .segment:active { cursor: grabbing; }
-    .segment-label {
-      pointer-events: none;
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      text-shadow: 0 1px 1px rgba(0,0,0,0.2);
-      white-space: nowrap;
-      padding: 0 8px;
-      opacity: 0.95;
-    }
-    .segment-handle { position: absolute; top: 0; bottom: 0; width: 10px; cursor: ew-resize; }
-    .segment-handle::after {
-      content: "";
-      position: absolute;
-      top: 9px;
-      bottom: 9px;
-      width: 2px;
-      border-radius: 1px;
-      background: rgba(255,255,255,0.9);
-    }
-    .segment-handle.start { left: 0; }
-    .segment-handle.start::after { left: 3px; }
-    .segment-handle.end { right: 0; }
-    .segment-handle.end::after { right: 3px; }
-    .timeline-empty {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      color: var(--muted);
-      font-size: 12px;
-      z-index: 1;
-      pointer-events: none;
+      flex-direction: column;
     }
 
+    /* Ruler */
     .timeline-ruler {
+      height: 20px;
+      width: 100%;
+      border-bottom: 1px solid var(--border-subtle);
       position: relative;
-      height: 28px;
-      margin-top: 6px;
-      color: #8e8e93;
-      font-size: 10px;
+      font-size: 9px;
+      color: var(--text-muted);
       font-variant-numeric: tabular-nums;
     }
     .ruler-tick {
       position: absolute;
-      top: 0;
+      bottom: 0;
+      width: 1px;
+      background: rgba(255, 255, 255, 0.15);
+      height: 6px;
+    }
+    .ruler-tick.major {
+      height: 10px;
+      background: rgba(255, 255, 255, 0.35);
+    }
+    .ruler-label {
+      position: absolute;
+      bottom: 9px;
       transform: translateX(-50%);
+      white-space: nowrap;
+    }
+
+    /* Segments Track */
+    .timeline-track {
+      flex: 1;
+      width: 100%;
+      position: relative;
+      margin: 8px 0;
+    }
+
+    .timeline-progress-layer {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 0%;
+      background: rgba(255, 255, 255, 0.04);
+      pointer-events: none;
+    }
+
+    /* Rally Block Component */
+    .rally-block {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      background: var(--accent-green-glass);
+      border: 1.5px solid var(--accent-green);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+      transition: border-color 0.15s ease, background 0.15s ease;
+      touch-action: none;
+    }
+    .rally-block.low-confidence {
+      background: var(--accent-amber-glass);
+      border-color: var(--accent-amber);
+    }
+    .rally-block.selected {
+      border-width: 2.5px;
+      border-color: #fff;
+      box-shadow: 0 0 14px rgba(255, 255, 255, 0.45);
+      z-index: 10;
+    }
+
+    .rally-label {
+      pointer-events: none;
+      white-space: nowrap;
+      padding: 0 6px;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Large Finger-Friendly Drag Handles */
+    .rally-handle {
+      position: absolute;
+      top: -4px;
+      bottom: -4px;
+      width: 22px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      cursor: ew-resize;
+      touch-action: none;
+      z-index: 15;
+    }
+    .rally-block.selected .rally-handle { display: flex; }
+
+    .rally-handle.start-handle {
+      left: -11px;
+    }
+    .rally-handle.end-handle {
+      right: -11px;
+    }
+
+    .handle-pill {
+      width: 6px;
+      height: 28px;
+      border-radius: 3px;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Playhead Needle */
+    .playhead-needle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #ff453a;
+      z-index: 20;
+      pointer-events: none;
+      transform: translateX(-50%);
+    }
+    .playhead-needle::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 12px;
+      height: 12px;
+      background: #ff453a;
+      clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+    }
+
+    /* Section: Sticky Thumb Action Zone (Fixed Bottom) */
+    .thumb-zone {
+      flex: 0 0 auto;
+      background: var(--surface-elevated);
+      border-top: 1px solid var(--border);
+      padding: 8px 12px calc(8px + var(--safe-bottom));
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 25;
+      box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Fine-Tuning Bar (Dynamic extension without restart) */
+    .fine-tune-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 4px 6px;
+    }
+
+    .tune-group {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+
+    .tune-tag {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-right: 2px;
+      font-weight: 500;
+    }
+
+    .tune-btn {
+      height: 32px;
+      padding: 0 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      font-size: 11px;
+      font-weight: 600;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.1s ease;
+    }
+    .tune-btn:active { transform: scale(0.92); background: rgba(255, 255, 255, 0.18); }
+    .tune-btn.extend-btn {
+      background: rgba(48, 209, 88, 0.25);
+      color: var(--accent-green);
+      border: 1px solid rgba(48, 209, 88, 0.35);
+    }
+    .tune-btn.extend-btn:active { background: rgba(48, 209, 88, 0.4); }
+
+    .play-rally-pill {
+      height: 32px;
+      padding: 0 14px;
+      border-radius: 16px;
+      background: var(--primary-gradient);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(10, 132, 255, 0.35);
+      white-space: nowrap;
+    }
+    .play-rally-pill:active { transform: scale(0.95); }
+    .play-rally-pill svg { width: 14px; height: 14px; }
+
+    /* Primary Key Buttons Grid */
+    .main-keys-bar {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 1fr 1fr 1.1fr 1.2fr;
+      gap: 6px;
+    }
+
+    .key-btn {
+      height: 42px;
+      border-radius: var(--radius-sm);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: 2px;
-      pointer-events: none;
-    }
-    .ruler-tick::before {
-      content: "";
-      width: 1px;
-      height: 8px;
-      background: rgba(60, 60, 67, 0.28);
-    }
-    .ruler-tick.major::before { height: 12px; background: rgba(60, 60, 67, 0.42); }
-    .ruler-tick span { white-space: nowrap; }
-
-    @media (max-width: 720px) {
-      .timeline-shell { height: 128px; }
-      .timeline-legend { width: 100%; }
-    }
-
-    .metrics {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      margin: 16px 0 4px;
-      border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-    }
-    .metric { min-width: 0; padding: 13px 14px; border-right: 1px solid var(--line); }
-    .metric:first-child { padding-left: 0; }
-    .metric:last-child { border-right: 0; }
-    .metric-label { color: var(--muted); font-size: 11px; }
-    .metric-value { margin-top: 4px; font-size: 17px; font-weight: 720; font-variant-numeric: tabular-nums; }
-
-    .rally-list { margin-top: 18px; }
-    .rally-list-header {
-      display: grid;
-      grid-template-columns: 44px minmax(100px, 1fr) minmax(100px, 1fr) 72px 96px;
-      align-items: center;
-      min-height: 34px;
-      padding: 0 8px;
-      color: var(--muted);
-      font-size: 11px;
-      border-bottom: 1px solid var(--line);
-    }
-    .rally-rows { max-height: 310px; overflow-y: auto; scrollbar-gutter: stable; }
-    .rally-row {
-      display: grid;
-      grid-template-columns: 44px minmax(100px, 1fr) minmax(100px, 1fr) 72px 96px;
-      align-items: center;
-      min-height: 60px;
-      padding: 0 8px;
-      border-bottom: 1px solid var(--line);
-      animation: enter 220ms ease both;
-    }
-    .rally-row:hover { background: rgba(0, 122, 255, 0.045); }
-    .rally-row.selected { background: rgba(0, 122, 255, 0.1); box-shadow: inset 3px 0 0 var(--blue); }
-    .rally-index { color: var(--blue); font-weight: 700; font-variant-numeric: tabular-nums; }
-    .time-input {
-      width: 100%;
-      max-width: 116px;
-      height: 40px;
-      padding: 0 9px;
-      color: var(--ink);
-      background: rgba(255, 255, 255, 0.72);
-      border: 1px solid var(--line-strong);
-      border-radius: 5px;
-      font-variant-numeric: tabular-nums;
-    }
-    .duration-cell { color: var(--muted); font-variant-numeric: tabular-nums; }
-    .row-actions { display: flex; justify-content: flex-end; gap: 0; }
-    .list-empty { min-height: 108px; display: grid; place-items: center; color: var(--muted); border-bottom: 1px solid var(--line); }
-
-    .inspector { min-width: 0; background: rgba(248, 248, 252, 0.58); }
-    .inspector-inner { position: sticky; top: 0; padding: 24px; }
-    .inspector-title { margin: 0; font-size: 16px; font-weight: 740; }
-    .inspector-subtitle { margin: 5px 0 22px; color: var(--muted); font-size: 12px; }
-    .control-group { padding: 18px 0; border-top: 1px solid var(--line); }
-    .control-group:first-of-type { border-top: 0; padding-top: 0; }
-    .control-label { display: block; margin-bottom: 9px; color: #3a3a3c; font-size: 12px; font-weight: 650; }
-
-    .segmented { display: grid; grid-template-columns: repeat(var(--columns, 3), minmax(0, 1fr)); gap: 3px; padding: 3px; background: rgba(118, 118, 128, 0.12); border-radius: 7px; }
-    .segmented input { position: absolute; opacity: 0; pointer-events: none; }
-    .segmented label {
-      min-width: 0;
-      min-height: 38px;
-      display: grid;
-      place-items: center;
-      padding: 5px 8px;
-      text-align: center;
-      color: #636366;
-      border-radius: 5px;
       cursor: pointer;
-      font-size: 12px;
-      font-weight: 620;
-      transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+      color: var(--text);
+      font-size: 11px;
+      font-weight: 500;
+      transition: all 0.12s ease;
     }
-    .segmented input:checked + label { color: var(--ink); background: rgba(255, 255, 255, 0.92); box-shadow: 0 1px 5px rgba(0, 0, 0, 0.11); }
+    .key-btn:active { transform: scale(0.95); background: rgba(255, 255, 255, 0.12); }
+    .key-btn:disabled { opacity: 0.35; pointer-events: none; }
+    .key-btn svg { width: 16px; height: 16px; }
 
-    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .field label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 11px; }
-    .field select, .field input[type="number"] {
-      width: 100%;
-      height: 38px;
-      padding: 0 9px;
-      color: var(--ink);
-      background: rgba(255, 255, 255, 0.76);
-      border: 1px solid var(--line-strong);
-      border-radius: 6px;
+    .key-btn.add-rally-btn {
+      background: var(--accent-green-glass);
+      border-color: rgba(48, 209, 88, 0.4);
+      color: var(--accent-green);
     }
-    .range-row { display: grid; grid-template-columns: minmax(0, 1fr) 38px; align-items: center; gap: 12px; }
-    input[type="range"] { width: 100%; accent-color: var(--blue); }
-    .range-value { height: 30px; display: grid; place-items: center; background: rgba(118, 118, 128, 0.11); border-radius: 5px; font-variant-numeric: tabular-nums; font-weight: 680; }
-
-    .export-button { width: 100%; min-height: 46px; margin-top: 4px; }
-    .export-result { display: none; margin-top: 14px; padding: 13px 0 0; border-top: 1px solid var(--line); }
-    .export-result.visible { display: block; animation: enter 240ms ease both; }
-    .export-result-title { display: flex; align-items: center; gap: 8px; color: var(--green-strong); font-weight: 720; }
-    .export-result-title svg { width: 17px; height: 17px; }
-    .export-result-meta { margin: 5px 0 12px; color: var(--muted); font-size: 12px; }
-    .download-link { width: 100%; text-decoration: none; }
-
-    .toast {
-      position: fixed;
-      left: 50%;
-      bottom: 24px;
-      z-index: 50;
-      max-width: min(440px, calc(100vw - 32px));
-      padding: 11px 14px;
+    .key-btn.delete-rally-btn {
+      color: var(--accent-red);
+    }
+    .key-btn.export-btn {
+      background: var(--primary);
+      border-color: var(--primary);
       color: #fff;
-      background: rgba(29, 29, 31, 0.9);
-      border-radius: 7px;
-      box-shadow: var(--shadow);
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(10, 132, 255, 0.35);
+    }
+
+    /* Bottom Sheets (Modal Drawers) */
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 50;
       opacity: 0;
       pointer-events: none;
-      transform: translate(-50%, 12px);
-      transition: opacity 180ms ease, transform 180ms ease;
+      transition: opacity 0.25s ease;
     }
-    .toast.visible { opacity: 1; transform: translate(-50%, 0); }
-    .toast.error { background: #852b2a; }
+    .sheet-backdrop.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
 
-    .hidden-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-    .spin { animation: spin 900ms linear infinite; }
+    .bottom-sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      max-width: 720px;
+      margin: 0 auto;
+      background: var(--surface-elevated);
+      border-top: 1px solid var(--border);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      z-index: 55;
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      max-height: 82vh;
+      box-shadow: var(--shadow-sheet);
+      padding-bottom: var(--safe-bottom);
+    }
+    .bottom-sheet.open {
+      transform: translateY(0);
+    }
 
-    @keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+    .sheet-handle-wrap {
+      width: 100%;
+      height: 20px;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+    }
+    .sheet-pill {
+      width: 38px;
+      height: 4px;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.25);
+    }
+
+    .sheet-header {
+      padding: 0 16px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .sheet-title-group h3 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .sheet-title-group p {
+      margin: 2px 0 0;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .sheet-close-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      display: grid;
+      place-items: center;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .sheet-close-btn svg { width: 16px; height: 16px; }
+
+    .sheet-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+    }
+
+    /* Rally List Cards */
+    .rally-cards-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .rally-card {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      cursor: pointer;
+      gap: 12px;
+      transition: background 0.12s ease;
+    }
+    .rally-card.selected {
+      background: rgba(10, 132, 255, 0.14);
+      border-color: var(--primary);
+    }
+    .rally-card-idx {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-muted);
+      width: 24px;
+    }
+    .rally-card-main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .rally-card-times {
+      font-size: 13px;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .rally-card-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .conf-badge {
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 500;
+      background: rgba(48, 209, 88, 0.2);
+      color: var(--accent-green);
+    }
+    .conf-badge.low {
+      background: rgba(255, 159, 10, 0.2);
+      color: var(--accent-amber);
+    }
+
+    .rally-card-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .card-act-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      display: grid;
+      place-items: center;
+      color: var(--text);
+      cursor: pointer;
+    }
+    .card-act-btn.delete { color: var(--accent-red); }
+    .card-act-btn svg { width: 15px; height: 15px; }
+
+    /* Export Form Components */
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .seg-control {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(60px, 1fr));
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 4px;
+    }
+    .seg-control input { display: none; }
+    .seg-control label {
+      display: block;
+      padding: 8px;
+      text-align: center;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .seg-control input:checked + label {
+      background: var(--surface-elevated);
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+      font-weight: 600;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .select-box {
+      width: 100%;
+      height: 38px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0 10px;
+      color: #fff;
+      font-size: 13px;
+    }
+
+    .export-submit-btn {
+      width: 100%;
+      height: 46px;
+      border-radius: var(--radius-md);
+      background: var(--primary-gradient);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(10, 132, 255, 0.35);
+      margin-top: 10px;
+    }
+    .export-submit-btn:disabled { opacity: 0.5; pointer-events: none; }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: rgba(28, 28, 38, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 8px 18px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 500;
+      box-shadow: 0 8px 28px rgba(0,0,0,0.5);
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.22s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+      white-space: nowrap;
+      backdrop-filter: blur(12px);
+    }
+    .toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.error {
+      border-color: rgba(255, 69, 58, 0.5);
+      background: rgba(45, 15, 15, 0.95);
+      color: #ff6961;
+    }
+
+    .hidden-input { display: none; }
+    .spin { animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    @keyframes indeterminate { 0% { transform: translateX(-110%); } 100% { transform: translateX(350%); } }
 
-    @media (max-width: 980px) {
-      .workspace { width: calc(100% - 24px); margin: 12px auto; grid-template-columns: 1fr; }
-      .editor { border-right: 0; }
-      .inspector { border-top: 1px solid var(--line); }
-      .inspector-inner { position: static; }
-    }
-
-    @media (max-width: 640px) {
-      .app-header { height: 58px; padding: 0 15px; }
-      .brand-subtitle, .api-state span { display: none; }
-      .workspace { width: 100%; min-height: calc(100vh - 58px); margin: 0; border: 0; border-radius: 0; }
-      .editor { padding: 16px 14px 26px; }
-      .source-bar { align-items: flex-start; }
-      .source-name { max-width: 58vw; }
-      .source-actions { gap: 4px; }
-      .button-change span { display: none; }
-      .button-change { width: 38px; padding: 0; }
-      .court-tools { inset: auto 8px 8px; }
-      .court-tools-label span { display: none; }
-      .video-stage { min-height: 180px; }
-      .progress-track { width: 70px; }
-      .section-heading { align-items: center; }
-      .section-heading p { display: none; }
-      .metrics { grid-template-columns: 1fr 1fr; }
-      .metric:nth-child(2) { border-right: 0; }
-      .metric:last-child { grid-column: 1 / -1; border-top: 1px solid var(--line); }
-      .rally-list-header { display: none; }
-      .rally-row {
-        grid-template-columns: 34px minmax(68px, 1fr) minmax(68px, 1fr) 92px;
-        gap: 6px;
-        padding: 8px 2px;
+    /* Desktop View Adaptive Refinement */
+    @media (min-width: 900px) {
+      body {
+        background: #060608;
       }
-      .duration-cell { display: none; }
-      .time-input { padding: 0 6px; }
-      .inspector-inner { padding: 22px 16px 28px; }
-    }
-
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+      .app-root {
+        border-left: 1px solid var(--border);
+        border-right: 1px solid var(--border);
+        box-shadow: 0 0 60px rgba(0,0,0,0.75);
+      }
+      .video-stage {
+        max-height: 52vh;
+      }
     }
   </style>
 </head>
 <body>
-  <header class="app-header">
-    <div class="brand">
-      <div class="brand-mark"><i data-lucide="scissors"></i></div>
-      <div>
-        <div class="brand-name">小白自动剪辑</div>
-        <div class="brand-subtitle">羽毛球回合智能剪辑</div>
+  <div class="app-root">
+    <!-- Top Compact Header -->
+    <header class="app-header">
+      <div class="brand-box">
+        <div class="brand-icon"><i data-lucide="scissors"></i></div>
+        <div class="brand-title">小白自动剪辑</div>
       </div>
-    </div>
-    <div class="api-state" id="apiState">
-      <span class="api-dot"></span>
-      <span id="apiStateText">正在连接服务</span>
-    </div>
-  </header>
-
-  <main class="workspace">
-    <section class="editor" aria-label="视频剪辑区">
-      <div class="source-bar">
-        <div class="source-meta">
-          <div class="source-name" id="sourceName">尚未选择录像</div>
-          <div class="source-detail" id="sourceDetail">等待导入</div>
+      <div class="header-actions">
+        <div class="status-pill" id="statusPill">
+          <span class="status-dot"></span>
+          <span id="statusText">连接中</span>
         </div>
-        <div class="source-actions">
-          <button class="button button-secondary button-change" id="calibrateCourtButton" title="校准目标球场" aria-label="校准目标球场" disabled>
-            <i data-lucide="scan-line"></i><span>目标球场</span>
-          </button>
-          <label for="videoInput" class="button button-secondary button-change" tabindex="0">
-            <i data-lucide="folder-open"></i><span>选择录像</span>
-          </label>
-        </div>
+        <label for="videoInput" class="header-btn" title="更换录像" tabindex="0">
+          <i data-lucide="folder-open"></i><span>选片</span>
+        </label>
       </div>
+    </header>
 
-      <input class="hidden-input" type="file" id="videoInput" accept="video/mp4,video/quicktime,video/x-matroska,video/webm">
+    <!-- Workspace -->
+    <div class="app-workspace">
+      <!-- Custom Video Stage -->
+      <section class="video-stage" id="videoStage">
+        <video id="videoPlayer" playsinline webkit-playsinline x5-playsinline preload="metadata"></video>
 
-      <div class="video-stage" id="videoStage">
-        <video id="videoPlayer" controls playsinline preload="metadata"></video>
-        <svg class="court-overlay" id="courtOverlay" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-label="目标球场边界">
-          <polygon class="court-area" id="courtArea"></polygon>
-          <g id="courtHandles"></g>
+        <!-- Court ROI SVG overlay -->
+        <svg class="court-overlay" id="courtOverlay" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+          <polygon class="court-polygon" id="courtPolygon"></polygon>
+          <g id="courtHandlesGroup"></g>
         </svg>
-        <div class="court-tools" id="courtTools">
-          <div class="court-tools-label"><i data-lucide="scan-line"></i><span>目标球场边界</span></div>
-          <div class="court-tool-actions">
-            <button class="button button-quiet button-icon" id="resetCourtButton" title="重置边界" aria-label="重置球场边界"><i data-lucide="rotate-ccw"></i></button>
-            <button class="button button-primary" id="confirmCourtButton"><i data-lucide="sparkles"></i>开始识别</button>
-          </div>
-        </div>
-        <div class="empty-source" id="emptySource">
-          <div class="empty-source-inner">
-            <div class="empty-icon"><i data-lucide="video"></i></div>
-            <h1 class="empty-title">导入比赛录像</h1>
-            <p class="empty-copy">MP4、MOV、MKV 或 WebM</p>
-            <label for="videoInput" class="button button-primary file-label" tabindex="0">
-              <i data-lucide="upload"></i>选择文件
-            </label>
-          </div>
-        </div>
-      </div>
 
-      <div class="task-banner" id="taskBanner" role="status" aria-live="polite">
-        <i data-lucide="loader-circle" id="taskIcon"></i>
-        <div class="task-banner-text" id="taskBannerText"></div>
-        <div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div></div>
-      </div>
+        <!-- Player Touch/Gesture Overlay -->
+        <div class="player-gesture-overlay" id="gestureOverlay">
+          <div class="gesture-side" id="gestureLeft"></div>
+          <div class="gesture-side" id="gestureRight"></div>
+        </div>
 
-      <section class="timeline-section" aria-labelledby="timelineTitle">
-        <div class="section-heading">
-          <div>
-            <h2 id="timelineTitle">自动识别回合</h2>
-            <p id="timelineSubtitle">支持缩放、左右滑动、拖拽调整起止时间</p>
-          </div>
-          <div class="timeline-actions">
-            <button class="button button-quiet button-icon button-toggle" id="smartSkipButton" title="跳过死球模式 (快捷键 X): 连续播放有效回合" aria-label="跳过死球模式">
-              <i data-lucide="fast-forward"></i>
-            </button>
-            <button class="button button-quiet button-icon button-toggle" id="loopRallyButton" title="单回合循环播放 (快捷键 L)" aria-label="单回合循环" disabled>
-              <i data-lucide="repeat"></i>
-            </button>
-            <button class="button button-quiet button-icon" id="setStartButton" title="将当前播放位置设为选中回合起点 (快捷键 [)" aria-label="设为起点" disabled>
-              <i data-lucide="step-back"></i>
-            </button>
-            <button class="button button-quiet button-icon" id="setEndButton" title="将当前播放位置设为选中回合终点 (快捷键 ])" aria-label="设为终点" disabled>
-              <i data-lucide="step-forward"></i>
-            </button>
-            <button class="button button-quiet button-icon" id="mergeAdjacentButton" title="合并相邻碎片回合 (<1.0s)" aria-label="合并相邻回合" disabled>
-              <i data-lucide="git-merge"></i>
-            </button>
-            <button class="button button-quiet button-icon" id="splitRallyButton" title="在播放头处拆分选中回合 (快捷键 S)" aria-label="拆分回合" disabled>
-              <i data-lucide="scissors"></i>
-            </button>
-            <button class="button button-quiet button-icon" id="deleteSelectedButton" title="删除选中回合 (快捷键 Delete)" aria-label="删除选中回合" disabled>
-              <i data-lucide="trash-2"></i>
-            </button>
-            <button class="button button-quiet button-icon" id="addRallyButton" title="在当前播放位置添加回合" aria-label="添加回合" disabled>
-              <i data-lucide="plus"></i>
-            </button>
+        <!-- Center Play/Pause / Seek Feedback Bubble -->
+        <div class="center-feedback" id="centerFeedback">
+          <i data-lucide="play" id="centerFeedbackIcon"></i>
+        </div>
+
+        <!-- In-Player HUD Top Overlay -->
+        <div class="hud-top" id="hudTop">
+          <div class="hud-video-name" id="hudVideoName">未载入录像</div>
+          <div class="hud-top-actions">
+            <button class="hud-chip" id="chipCalibrate" title="标定目标球场"><i data-lucide="scan-line"></i><span>标定</span></button>
+            <button class="hud-chip" id="chipSmartSkip" title="跳过死球模式"><i data-lucide="fast-forward"></i><span>跳死球</span></button>
+            <button class="hud-chip" id="chipLoop" title="循环本段"><i data-lucide="repeat"></i><span>循环</span></button>
           </div>
         </div>
 
-        <div class="timeline-toolbar">
-          <div class="timeline-tools" role="group" aria-label="时间轴缩放">
-            <button class="button button-quiet button-icon" id="zoomOutButton" title="缩小" aria-label="缩小时间轴">
-              <i data-lucide="zoom-out"></i>
-            </button>
-            <span class="timeline-zoom-label" id="timelineZoomLabel">100%</span>
-            <button class="button button-quiet button-icon" id="zoomInButton" title="放大" aria-label="放大时间轴">
-              <i data-lucide="zoom-in"></i>
-            </button>
-            <button class="button button-quiet button-icon" id="zoomFitButton" title="适应窗口" aria-label="适应窗口">
-              <i data-lucide="maximize-2"></i>
-            </button>
-            <button class="button button-quiet button-icon" id="scrollToPlayheadButton" title="定位到播放头" aria-label="定位到播放头">
-              <i data-lucide="locate-fixed"></i>
-            </button>
-          </div>
-          <div class="timeline-legend">
-            <span class="legend-item"><span class="legend-swatch normal"></span>正常</span>
-            <span class="legend-item"><span class="legend-swatch low"></span>低置信度</span>
-            <span class="timeline-range-label" id="timelineRangeLabel">可见 00:00 - 00:00</span>
-          </div>
-        </div>
-
-        <div class="timeline-shell" id="timelineShell">
-          <div class="timeline-viewport" id="timelineViewport" title="滚轮缩放 · 拖空白处平移 · 点击定位">
-            <div class="timeline-canvas" id="timelineCanvas">
-              <div class="timeline-track" id="timelineTrack">
-                <div class="timeline-progress" id="timelineProgress"></div>
-                <div class="timeline-empty" id="timelineEmpty">等待识别结果</div>
-              </div>
-              <div class="timeline-ruler" id="timelineRuler"></div>
+        <!-- In-Player HUD Bottom Controls -->
+        <div class="hud-bottom" id="hudBottom">
+          <!-- Mini Scrubber Track -->
+          <div class="mini-scrub-box" id="miniScrubBox">
+            <div class="mini-scrub-track">
+              <div class="mini-scrub-fill" id="miniScrubFill"></div>
+              <div class="mini-scrub-rallies" id="miniScrubRallies"></div>
             </div>
           </div>
-        </div>
-
-        <div class="metrics">
-          <div class="metric"><div class="metric-label">原片时长</div><div class="metric-value" id="originalDuration">00:00</div></div>
-          <div class="metric"><div class="metric-label">预计成片</div><div class="metric-value" id="selectedDuration">00:00</div></div>
-          <div class="metric"><div class="metric-label">预计精简</div><div class="metric-value" id="reductionRate">0%</div></div>
-        </div>
-
-        <div class="rally-list">
-          <div class="rally-list-header">
-            <span>序号</span><span>开始</span><span>结束</span><span>时长</span><span></span>
+          <!-- Controls Row -->
+          <div class="hud-controls-row">
+            <button class="hud-icon-btn" id="hudPlayBtn"><i data-lucide="play" id="hudPlayIcon"></i></button>
+            <div class="hud-time-readout">
+              <span id="curTimeStr">00:00.0</span> / <span id="durTimeStr">00:00.0</span>
+            </div>
+            <div class="hud-spacer"></div>
+            <button class="hud-pill-btn" id="stepPrevBtn">-1帧</button>
+            <button class="hud-pill-btn" id="stepNextBtn">+1帧</button>
+            <div class="speed-picker">
+              <button class="hud-pill-btn" id="speedToggleBtn">1.0x</button>
+              <div class="speed-menu" id="speedMenu">
+                <div class="speed-opt" data-speed="0.5">0.5x</div>
+                <div class="speed-opt" data-speed="0.75">0.75x</div>
+                <div class="speed-opt active" data-speed="1.0">1.0x</div>
+                <div class="speed-opt" data-speed="1.25">1.25x</div>
+                <div class="speed-opt" data-speed="1.5">1.5x</div>
+                <div class="speed-opt" data-speed="2.0">2.0x</div>
+              </div>
+            </div>
+            <button class="hud-icon-btn" id="fullscreenBtn" title="全屏"><i data-lucide="maximize-2"></i></button>
           </div>
-          <div class="rally-rows" id="rallyRows">
-            <div class="list-empty">暂无回合</div>
+        </div>
+
+        <!-- Court Calibration Bottom Bar -->
+        <div class="court-tools-bar" id="courtToolsBar">
+          <span>拖动 4 个锚点标定球场</span>
+          <button class="court-bar-btn secondary" id="courtResetBtn">重置</button>
+          <button class="court-bar-btn primary" id="courtConfirmBtn">开始AI分析</button>
+        </div>
+
+        <!-- Empty State Screen -->
+        <div class="empty-stage" id="emptyStage">
+          <div class="empty-icon-wrap"><i data-lucide="video"></i></div>
+          <div class="empty-text-title">导入羽毛球比赛录像</div>
+          <div class="empty-text-desc">支持 MP4、MOV、MKV、WebM 等格式</div>
+          <label for="videoInput" class="empty-upload-btn" tabindex="0">
+            <i data-lucide="upload"></i><span>选择视频文件</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Task Status Banner -->
+      <div class="task-banner" id="taskBanner">
+        <div class="task-banner-left">
+          <i data-lucide="loader-circle" id="taskIcon"></i>
+          <span id="taskMsg">准备就绪</span>
+        </div>
+        <div class="task-progress-mini" id="taskProgressMini">
+          <div class="task-progress-fill" id="taskProgressFill"></div>
+        </div>
+      </div>
+
+      <!-- Tactile Mobile Timeline Container -->
+      <section class="timeline-container">
+        <div class="timeline-toolbar">
+          <div class="active-rally-tag" id="activeRallyLabel">
+            <i data-lucide="info"></i><span>等待识别或添加回合</span>
+          </div>
+          <div class="zoom-controls">
+            <button class="zoom-btn" id="zoomOutBtn" title="缩小"><i data-lucide="zoom-out"></i></button>
+            <span id="zoomLevelText">100%</span>
+            <button class="zoom-btn" id="zoomInBtn" title="放大"><i data-lucide="zoom-in"></i></button>
+            <button class="zoom-btn" id="zoomFitBtn" title="适应"><i data-lucide="minimize"></i></button>
+            <button class="zoom-btn" id="seekPlayheadBtn" title="定位"><i data-lucide="locate-fixed"></i></button>
+          </div>
+        </div>
+
+        <!-- Scrollable Timeline Track Viewport -->
+        <div class="timeline-viewport" id="timelineViewport">
+          <div class="timeline-canvas" id="timelineCanvas">
+            <div class="timeline-ruler" id="timelineRuler"></div>
+            <div class="timeline-track" id="timelineTrack">
+              <div class="timeline-progress-layer" id="timelineProgressLayer"></div>
+              <div class="rallies-container" id="ralliesContainer"></div>
+            </div>
+            <!-- Playhead Needle -->
+            <div class="playhead-needle" id="playheadNeedle"></div>
           </div>
         </div>
       </section>
-    </section>
+    </div>
 
-    <aside class="inspector" aria-label="导出设置">
-      <div class="inspector-inner">
-        <h2 class="inspector-title">导出设置</h2>
-        <p class="inspector-subtitle" id="exportSummary">完成分析后即可导出</p>
-
-        <div class="control-group">
-          <span class="control-label">输出方式</span>
-          <div class="segmented" style="--columns: 2">
-            <input type="radio" name="exportType" id="typeMerged" value="merged" checked>
-            <label for="typeMerged">合并视频</label>
-            <input type="radio" name="exportType" id="typeZip" value="zip">
-            <label for="typeZip">分段 ZIP</label>
-          </div>
+    <!-- Sticky Bottom Thumb Action Zone -->
+    <footer class="thumb-zone">
+      <!-- Fine-Tuning Bar: Dynamic Duration Extension WITHOUT RESTART -->
+      <div class="fine-tune-bar">
+        <div class="tune-group">
+          <span class="tune-tag">起点</span>
+          <button class="tune-btn" id="tuneStartMinus" title="起点 -0.5s">-0.5s</button>
+          <button class="tune-btn" id="tuneStartPlus" title="起点 +0.5s">+0.5s</button>
         </div>
 
-        <div class="control-group">
-          <span class="control-label">分辨率</span>
-          <div class="segmented">
-            <input type="radio" name="resolution" id="resolutionOriginal" value="original">
-            <label for="resolutionOriginal">原画</label>
-            <input type="radio" name="resolution" id="resolution1080" value="1080p" checked>
-            <label for="resolution1080">1080p</label>
-            <input type="radio" name="resolution" id="resolution720" value="720p">
-            <label for="resolution720">720p</label>
-          </div>
-        </div>
+        <button class="play-rally-pill" id="playRallyPill">
+          <i data-lucide="play" id="playRallyPillIcon"></i>
+          <span id="playRallyPillText">播放本段</span>
+        </button>
 
-        <div class="control-group">
-          <span class="control-label">编码格式</span>
-          <div class="segmented" style="--columns: 2">
+        <div class="tune-group">
+          <span class="tune-tag">终点</span>
+          <button class="tune-btn" id="tuneEndMinus" title="终点 -0.5s">-0.5s</button>
+          <button class="tune-btn extend-btn" id="tuneEndPlus" title="终点 +0.5s (边播边顺延)">+0.5s</button>
+        </div>
+      </div>
+
+      <!-- Main Action Key Bar -->
+      <div class="main-keys-bar">
+        <button class="key-btn add-rally-btn" id="btnAddRally" title="在当前播放位置添加新回合">
+          <i data-lucide="plus"></i>
+          <span>+回合</span>
+        </button>
+        <button class="key-btn" id="btnSplitRally" title="在播放头处拆分选中回合" disabled>
+          <i data-lucide="scissors"></i>
+          <span>拆分</span>
+        </button>
+        <button class="key-btn" id="btnMergeRallies" title="合并相邻碎片回合 (<1.0s)" disabled>
+          <i data-lucide="git-merge"></i>
+          <span>合并</span>
+        </button>
+        <button class="key-btn delete-rally-btn" id="btnDeleteRally" title="删除当前选定回合" disabled>
+          <i data-lucide="trash-2"></i>
+          <span>删除</span>
+        </button>
+        <button class="key-btn" id="btnOpenRalliesSheet" title="查看全部回合列表">
+          <i data-lucide="list"></i>
+          <span id="rallyCountText">回合 (0)</span>
+        </button>
+        <button class="key-btn export-btn" id="btnOpenExportSheet" title="导出剪辑视频" disabled>
+          <i data-lucide="download"></i>
+          <span>导出</span>
+        </button>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Bottom Sheet 1: Rally List -->
+  <div class="sheet-backdrop" id="rallySheetBackdrop"></div>
+  <div class="bottom-sheet" id="rallySheet">
+    <div class="sheet-handle-wrap" id="rallySheetHandle"><div class="sheet-pill"></div></div>
+    <div class="sheet-header">
+      <div class="sheet-title-group">
+        <h3>对战回合列表</h3>
+        <p id="rallyStatsSummary">共 0 个回合 · 预计剪出 00:00 (精简 0%)</p>
+      </div>
+      <button class="sheet-close-btn" id="closeRallySheetBtn"><i data-lucide="x"></i></button>
+    </div>
+    <div class="sheet-body">
+      <div class="rally-cards-list" id="rallyCardsList">
+        <div style="text-align: center; color: var(--text-muted); padding: 24px 0;">暂无回合，请标定球场后开始分析或点击“+回合”</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Sheet 2: Export Options -->
+  <div class="sheet-backdrop" id="exportSheetBackdrop"></div>
+  <div class="bottom-sheet" id="exportSheet">
+    <div class="sheet-handle-wrap" id="exportSheetHandle"><div class="sheet-pill"></div></div>
+    <div class="sheet-header">
+      <div class="sheet-title-group">
+        <h3>导出剪辑配置</h3>
+        <p id="exportMetaSummary">已选择全部有效回合</p>
+      </div>
+      <button class="sheet-close-btn" id="closeExportSheetBtn"><i data-lucide="x"></i></button>
+    </div>
+    <div class="sheet-body">
+      <div class="form-group">
+        <label class="form-label">输出形式</label>
+        <div class="seg-control">
+          <input type="radio" name="exportType" id="typeMerged" value="merged" checked>
+          <label for="typeMerged">合并为一个 MP4 视频</label>
+          <input type="radio" name="exportType" id="typeZip" value="zip">
+          <label for="typeZip">各分段打包 (ZIP)</label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">导出分辨率上限</label>
+        <div class="seg-control">
+          <input type="radio" name="resolution" id="res1080" value="1080p" checked>
+          <label for="res1080">1080p 高清</label>
+          <input type="radio" name="resolution" id="res720" value="720p">
+          <label for="res720">720p 流畅</label>
+          <input type="radio" name="resolution" id="resOrig" value="original">
+          <label for="resOrig">原画维持</label>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">视频编码</label>
+          <div class="seg-control">
             <input type="radio" name="codec" id="codecH264" value="h264" checked>
             <label for="codecH264">H.264</label>
             <input type="radio" name="codec" id="codecHevc" value="hevc">
             <label for="codecHevc">HEVC</label>
           </div>
         </div>
-
-        <div class="control-group">
-          <label class="control-label" for="crfRange">压缩质量</label>
-          <div class="range-row">
-            <input type="range" id="crfRange" min="18" max="32" step="1" value="24">
-            <output class="range-value" id="crfValue" for="crfRange">24</output>
-          </div>
-        </div>
-
-        <div class="control-group">
-          <span class="control-label">回合缓冲</span>
-          <div class="field-grid">
-            <div class="field">
-              <label for="preBuffer">发球前</label>
-              <select id="preBuffer"><option value="0" selected>0 秒</option><option value="0.3">0.3 秒</option><option value="0.5">0.5 秒</option><option value="1">1.0 秒</option></select>
-            </div>
-            <div class="field">
-              <label for="postBuffer">落地后</label>
-              <select id="postBuffer"><option value="0" selected>0 秒</option><option value="0.2">0.2 秒</option><option value="0.5">0.5 秒</option><option value="1">1.0 秒</option></select>
-            </div>
-          </div>
-        </div>
-
-        <button class="button button-primary export-button" id="exportButton" disabled>
-          <i data-lucide="download"></i><span id="exportButtonText">生成剪辑</span>
-        </button>
-
-        <div class="export-result" id="exportResult">
-          <div class="export-result-title"><i data-lucide="circle-check"></i>导出完成</div>
-          <div class="export-result-meta" id="exportResultMeta"></div>
-          <a class="button button-secondary download-link" id="downloadLink" href="#" download>
-            <i data-lucide="download"></i>下载文件
-          </a>
+        <div class="form-group">
+          <label class="form-label">压缩品质 (CRF)</label>
+          <select class="select-box" id="crfSelect">
+            <option value="20">高品质 (CRF 20)</option>
+            <option value="24" selected>推荐平衡 (CRF 24)</option>
+            <option value="28">超轻体积 (CRF 28)</option>
+          </select>
         </div>
       </div>
-    </aside>
-  </main>
 
-  <div class="toast" id="toast" role="alert"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">发球前缓冲</label>
+          <select class="select-box" id="preBufferSelect">
+            <option value="0" selected>0 秒 (紧凑)</option>
+            <option value="0.3">0.3 秒</option>
+            <option value="0.5">0.5 秒</option>
+            <option value="1.0">1.0 秒</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">落地后缓冲</label>
+          <select class="select-box" id="postBufferSelect">
+            <option value="0" selected>0 秒 (紧凑)</option>
+            <option value="0.3">0.3 秒</option>
+            <option value="0.5">0.5 秒</option>
+            <option value="1.0">1.0 秒</option>
+          </select>
+        </div>
+      </div>
 
+      <button class="export-submit-btn" id="exportSubmitBtn">
+        <i data-lucide="sparkles"></i><span id="exportSubmitText">立即生成并下载剪辑</span>
+      </button>
+
+      <div id="exportResultBox" style="display: none; margin-top: 14px; text-align: center;">
+        <div style="color: var(--accent-green); font-weight: 600; font-size: 14px; margin-bottom: 8px;">
+          ✓ 导出成功，如未自动开始下载，请点击：
+        </div>
+        <a id="exportDownloadLink" href="#" download style="display: inline-block; padding: 8px 18px; border-radius: 20px; background: var(--surface-elevated); border: 1px solid var(--border); color: #fff; text-decoration: none; font-size: 13px;">
+          点击保存文件
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hidden File Picker -->
+  <input class="hidden-input" type="file" id="videoInput" accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/avi">
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Core JavaScript Engine -->
   <script>
     const API_BASE = '';
     const DEFAULT_COURT_ROI = [
@@ -903,245 +1495,856 @@
       { x: 0.98, y: 0.96 },
       { x: 0.02, y: 0.96 },
     ];
+
     const state = {
       taskId: null,
       file: null,
       objectUrl: null,
       duration: 0,
       rallies: [],
+      selectedRallyIndex: null,
       status: 'idle',
       pollTimer: null,
-      drag: null,
-      exportObjectUrl: null,
-      rallyPlaybackEnd: null,
+      hudTimer: null,
       smartSkip: false,
       loopRally: false,
-      courtRoi: DEFAULT_COURT_ROI.map(point => ({ ...point })),
+      playbackRate: 1.0,
+      rallyPlaybackEnd: null,
+      courtRoi: DEFAULT_COURT_ROI.map(p => ({ ...p })),
       courtDragIndex: null,
-      statusBeforeCalibration: 'idle',
-      timelineZoom: 1,
-      selectedRallyIndex: null,
-      timelinePan: null,
+      timelineZoom: 1.0,
+      isDraggingRallyHandle: null, // { type: 'start'|'end', index: number, startX: number, initVal: number }
+      isScrubbingMini: false,
+      exportBlobUrl: null,
     };
 
-    const TIMELINE_MIN_ZOOM = 1;
-    const TIMELINE_MAX_ZOOM = 24;
-
+    // DOM References
     const elements = {
-      apiState: document.getElementById('apiState'),
-      apiStateText: document.getElementById('apiStateText'),
+      statusPill: document.getElementById('statusPill'),
+      statusText: document.getElementById('statusText'),
       videoInput: document.getElementById('videoInput'),
       videoStage: document.getElementById('videoStage'),
       videoPlayer: document.getElementById('videoPlayer'),
+      gestureOverlay: document.getElementById('gestureOverlay'),
+      gestureLeft: document.getElementById('gestureLeft'),
+      gestureRight: document.getElementById('gestureRight'),
+      centerFeedback: document.getElementById('centerFeedback'),
+      centerFeedbackIcon: document.getElementById('centerFeedbackIcon'),
+      hudTop: document.getElementById('hudTop'),
+      hudBottom: document.getElementById('hudBottom'),
+      hudVideoName: document.getElementById('hudVideoName'),
+      chipCalibrate: document.getElementById('chipCalibrate'),
+      chipSmartSkip: document.getElementById('chipSmartSkip'),
+      chipLoop: document.getElementById('chipLoop'),
+      miniScrubBox: document.getElementById('miniScrubBox'),
+      miniScrubFill: document.getElementById('miniScrubFill'),
+      miniScrubRallies: document.getElementById('miniScrubRallies'),
+      hudPlayBtn: document.getElementById('hudPlayBtn'),
+      hudPlayIcon: document.getElementById('hudPlayIcon'),
+      curTimeStr: document.getElementById('curTimeStr'),
+      durTimeStr: document.getElementById('durTimeStr'),
+      stepPrevBtn: document.getElementById('stepPrevBtn'),
+      stepNextBtn: document.getElementById('stepNextBtn'),
+      speedToggleBtn: document.getElementById('speedToggleBtn'),
+      speedMenu: document.getElementById('speedMenu'),
+      fullscreenBtn: document.getElementById('fullscreenBtn'),
       courtOverlay: document.getElementById('courtOverlay'),
-      courtArea: document.getElementById('courtArea'),
-      courtHandles: document.getElementById('courtHandles'),
-      courtTools: document.getElementById('courtTools'),
-      calibrateCourtButton: document.getElementById('calibrateCourtButton'),
-      resetCourtButton: document.getElementById('resetCourtButton'),
-      confirmCourtButton: document.getElementById('confirmCourtButton'),
-      emptySource: document.getElementById('emptySource'),
-      sourceName: document.getElementById('sourceName'),
-      sourceDetail: document.getElementById('sourceDetail'),
+      courtPolygon: document.getElementById('courtPolygon'),
+      courtHandlesGroup: document.getElementById('courtHandlesGroup'),
+      courtToolsBar: document.getElementById('courtToolsBar'),
+      courtResetBtn: document.getElementById('courtResetBtn'),
+      courtConfirmBtn: document.getElementById('courtConfirmBtn'),
+      emptyStage: document.getElementById('emptyStage'),
       taskBanner: document.getElementById('taskBanner'),
-      taskBannerText: document.getElementById('taskBannerText'),
+      taskMsg: document.getElementById('taskMsg'),
       taskIcon: document.getElementById('taskIcon'),
-      progressTrack: document.getElementById('progressTrack'),
-      progressFill: document.getElementById('progressFill'),
-      timelineShell: document.getElementById('timelineShell'),
+      taskProgressMini: document.getElementById('taskProgressMini'),
+      taskProgressFill: document.getElementById('taskProgressFill'),
+      activeRallyLabel: document.getElementById('activeRallyLabel'),
+      zoomLevelText: document.getElementById('zoomLevelText'),
+      zoomOutBtn: document.getElementById('zoomOutBtn'),
+      zoomInBtn: document.getElementById('zoomInBtn'),
+      zoomFitBtn: document.getElementById('zoomFitBtn'),
+      seekPlayheadBtn: document.getElementById('seekPlayheadBtn'),
       timelineViewport: document.getElementById('timelineViewport'),
       timelineCanvas: document.getElementById('timelineCanvas'),
-      timelineTrack: document.getElementById('timelineTrack'),
-      timelineEmpty: document.getElementById('timelineEmpty'),
-      timelineProgress: document.getElementById('timelineProgress'),
       timelineRuler: document.getElementById('timelineRuler'),
-      timelineZoomLabel: document.getElementById('timelineZoomLabel'),
-      timelineRangeLabel: document.getElementById('timelineRangeLabel'),
-      zoomInButton: document.getElementById('zoomInButton'),
-      zoomOutButton: document.getElementById('zoomOutButton'),
-      zoomFitButton: document.getElementById('zoomFitButton'),
-      scrollToPlayheadButton: document.getElementById('scrollToPlayheadButton'),
-      smartSkipButton: document.getElementById('smartSkipButton'),
-      loopRallyButton: document.getElementById('loopRallyButton'),
-      setStartButton: document.getElementById('setStartButton'),
-      setEndButton: document.getElementById('setEndButton'),
-      mergeAdjacentButton: document.getElementById('mergeAdjacentButton'),
-      splitRallyButton: document.getElementById('splitRallyButton'),
-      deleteSelectedButton: document.getElementById('deleteSelectedButton'),
-      originalDuration: document.getElementById('originalDuration'),
-      selectedDuration: document.getElementById('selectedDuration'),
-      reductionRate: document.getElementById('reductionRate'),
-      rallyRows: document.getElementById('rallyRows'),
-      addRallyButton: document.getElementById('addRallyButton'),
-      exportButton: document.getElementById('exportButton'),
-      exportButtonText: document.getElementById('exportButtonText'),
-      exportSummary: document.getElementById('exportSummary'),
-      exportResult: document.getElementById('exportResult'),
-      exportResultMeta: document.getElementById('exportResultMeta'),
-      downloadLink: document.getElementById('downloadLink'),
-      crfRange: document.getElementById('crfRange'),
-      crfValue: document.getElementById('crfValue'),
+      timelineTrack: document.getElementById('timelineTrack'),
+      timelineProgressLayer: document.getElementById('timelineProgressLayer'),
+      ralliesContainer: document.getElementById('ralliesContainer'),
+      playheadNeedle: document.getElementById('playheadNeedle'),
+      tuneStartMinus: document.getElementById('tuneStartMinus'),
+      tuneStartPlus: document.getElementById('tuneStartPlus'),
+      tuneEndMinus: document.getElementById('tuneEndMinus'),
+      tuneEndPlus: document.getElementById('tuneEndPlus'),
+      playRallyPill: document.getElementById('playRallyPill'),
+      playRallyPillIcon: document.getElementById('playRallyPillIcon'),
+      playRallyPillText: document.getElementById('playRallyPillText'),
+      btnAddRally: document.getElementById('btnAddRally'),
+      btnSplitRally: document.getElementById('btnSplitRally'),
+      btnMergeRallies: document.getElementById('btnMergeRallies'),
+      btnDeleteRally: document.getElementById('btnDeleteRally'),
+      btnOpenRalliesSheet: document.getElementById('btnOpenRalliesSheet'),
+      rallyCountText: document.getElementById('rallyCountText'),
+      btnOpenExportSheet: document.getElementById('btnOpenExportSheet'),
+      rallySheetBackdrop: document.getElementById('rallySheetBackdrop'),
+      rallySheet: document.getElementById('rallySheet'),
+      closeRallySheetBtn: document.getElementById('closeRallySheetBtn'),
+      rallyStatsSummary: document.getElementById('rallyStatsSummary'),
+      rallyCardsList: document.getElementById('rallyCardsList'),
+      exportSheetBackdrop: document.getElementById('exportSheetBackdrop'),
+      exportSheet: document.getElementById('exportSheet'),
+      closeExportSheetBtn: document.getElementById('closeExportSheetBtn'),
+      exportMetaSummary: document.getElementById('exportMetaSummary'),
+      crfSelect: document.getElementById('crfSelect'),
+      preBufferSelect: document.getElementById('preBufferSelect'),
+      postBufferSelect: document.getElementById('postBufferSelect'),
+      exportSubmitBtn: document.getElementById('exportSubmitBtn'),
+      exportSubmitText: document.getElementById('exportSubmitText'),
+      exportResultBox: document.getElementById('exportResultBox'),
+      exportDownloadLink: document.getElementById('exportDownloadLink'),
       toast: document.getElementById('toast'),
     };
 
     function refreshIcons() {
-      if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+      if (window.lucide) window.lucide.createIcons();
     }
 
-    function formatTime(seconds, tenths = false) {
+    function formatTime(seconds, tenths = true) {
       const safe = Math.max(0, Number(seconds) || 0);
-      const minutes = Math.floor(safe / 60);
-      const remainder = safe - minutes * 60;
-      if (tenths) return `${String(minutes).padStart(2, '0')}:${remainder.toFixed(1).padStart(4, '0')}`;
-      return `${String(minutes).padStart(2, '0')}:${String(Math.floor(remainder)).padStart(2, '0')}`;
-    }
-
-    function updateCourtOverlayBounds() {
-      if (!elements.videoPlayer.videoWidth || !elements.videoStage.clientWidth) return;
-      const stageWidth = elements.videoStage.clientWidth;
-      const stageHeight = elements.videoStage.clientHeight;
-      const videoAspect = elements.videoPlayer.videoWidth / elements.videoPlayer.videoHeight;
-      const stageAspect = stageWidth / stageHeight;
-      let width = stageWidth;
-      let height = stageHeight;
-      let left = 0;
-      let top = 0;
-      if (videoAspect > stageAspect) {
-        height = stageWidth / videoAspect;
-        top = (stageHeight - height) / 2;
-      } else {
-        width = stageHeight * videoAspect;
-        left = (stageWidth - width) / 2;
+      const mins = Math.floor(safe / 60);
+      const secs = safe - mins * 60;
+      if (tenths) {
+        return `${String(mins).padStart(2, '0')}:${secs.toFixed(1).padStart(4, '0')}`;
       }
-      Object.assign(elements.courtOverlay.style, {
-        left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px`,
-      });
+      return `${String(mins).padStart(2, '0')}:${String(Math.floor(secs)).padStart(2, '0')}`;
     }
 
-    function renderCourtOverlay() {
-      elements.courtArea.setAttribute('points', state.courtRoi.map(point => `${point.x * 1000},${point.y * 1000}`).join(' '));
-      elements.courtHandles.innerHTML = state.courtRoi.map((point, index) => `
-        <g data-court-index="${index}">
-          <circle class="court-handle-hit" cx="${point.x * 1000}" cy="${point.y * 1000}" r="48"></circle>
-          <circle class="court-handle" cx="${point.x * 1000}" cy="${point.y * 1000}" r="17"></circle>
-        </g>`).join('');
-      elements.courtHandles.querySelectorAll('[data-court-index]').forEach(handle => {
-        handle.addEventListener('pointerdown', event => {
-          event.preventDefault();
-          state.courtDragIndex = Number(handle.dataset.courtIndex);
-          elements.courtOverlay.setPointerCapture?.(event.pointerId);
-        });
-      });
-      updateCourtOverlayBounds();
-    }
-
-    function openCourtCalibration() {
-      if (!state.taskId || ['uploading', 'analyzing', 'exporting'].includes(state.status)) return;
-      state.statusBeforeCalibration = state.status;
-      state.status = 'calibrating';
-      state.rallyPlaybackEnd = null;
-      elements.videoPlayer.pause();
-      elements.courtOverlay.classList.add('visible');
-      elements.courtTools.classList.add('visible');
-      renderCourtOverlay();
-      setTaskBanner('调整目标球场边界', 'working');
-      renderControls();
-    }
-
-    function closeCourtCalibration() {
-      state.courtDragIndex = null;
-      elements.courtOverlay.classList.remove('visible');
-      elements.courtTools.classList.remove('visible');
-    }
-
-    function moveCourtHandle(event) {
-      if (state.courtDragIndex === null) return;
-      const rect = elements.courtOverlay.getBoundingClientRect();
-      if (!rect.width || !rect.height) return;
-      const point = state.courtRoi[state.courtDragIndex];
-      point.x = Math.max(0.01, Math.min(0.99, (event.clientX - rect.left) / rect.width));
-      point.y = Math.max(0.01, Math.min(0.99, (event.clientY - rect.top) / rect.height));
-      renderCourtOverlay();
-    }
-
-    function showToast(message, type = 'normal') {
-      elements.toast.textContent = message;
-      elements.toast.className = `toast visible${type === 'error' ? ' error' : ''}`;
+    function showToast(msg, isError = false) {
+      elements.toast.textContent = msg;
+      elements.toast.className = `toast visible${isError ? ' error' : ''}`;
       clearTimeout(showToast.timer);
-      showToast.timer = setTimeout(() => elements.toast.classList.remove('visible'), 3200);
+      showToast.timer = setTimeout(() => elements.toast.classList.remove('visible'), 2600);
     }
 
-    function setTaskBanner(message, mode = 'working', progress = null) {
-      elements.taskBanner.className = `task-banner visible${mode === 'error' ? ' error' : mode === 'success' ? ' success' : ''}`;
-      elements.taskBannerText.textContent = message;
-      const taskIcon = document.getElementById('taskIcon');
-      taskIcon.setAttribute('data-lucide', mode === 'error' ? 'circle-alert' : mode === 'success' ? 'circle-check' : 'loader-circle');
-      taskIcon.classList.toggle('spin', mode === 'working');
-      elements.progressTrack.classList.toggle('indeterminate', mode === 'working' && progress === null);
-      elements.progressTrack.style.display = mode === 'working' ? 'block' : 'none';
-      elements.progressFill.style.width = progress === null ? '0%' : `${progress}%`;
+    function setTaskBanner(msg, status = 'working', pct = null) {
+      elements.taskBanner.className = `task-banner visible ${status}`;
+      elements.taskMsg.textContent = msg;
+      const isWork = status === 'working';
+      elements.taskIcon.setAttribute('data-lucide', status === 'error' ? 'circle-alert' : status === 'success' ? 'circle-check' : 'loader-circle');
+      elements.taskIcon.classList.toggle('spin', isWork);
+      elements.taskProgressMini.classList.toggle('indeterminate', isWork && pct === null);
+      elements.taskProgressMini.style.display = isWork ? 'block' : 'none';
+      if (pct !== null) elements.taskProgressFill.style.width = `${pct}%`;
       refreshIcons();
-      elements.taskIcon = document.getElementById('taskIcon');
     }
 
     function hideTaskBanner() {
       elements.taskBanner.classList.remove('visible');
     }
 
-    async function checkApi() {
+    async function checkApiHealth() {
       try {
-        const response = await fetch(`${API_BASE}/api/health`, { cache: 'no-store' });
-        if (!response.ok) throw new Error('offline');
-        elements.apiState.className = 'api-state online';
-        elements.apiStateText.textContent = '服务已连接';
+        const res = await fetch(`${API_BASE}/api/health`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('offline');
+        elements.statusPill.className = 'status-pill online';
+        elements.statusText.textContent = '服务在线';
       } catch {
-        elements.apiState.className = 'api-state offline';
-        elements.apiStateText.textContent = '服务不可用';
+        elements.statusPill.className = 'status-pill offline';
+        elements.statusText.textContent = '服务未连接';
       }
     }
 
-    function resetForFile(file) {
-      clearInterval(state.pollTimer);
-      if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-      if (state.exportObjectUrl) URL.revokeObjectURL(state.exportObjectUrl);
-      state.taskId = null;
-      state.file = file;
-      state.duration = 0;
-      state.rallies = [];
-      state.rallyPlaybackEnd = null;
-      state.courtRoi = DEFAULT_COURT_ROI.map(point => ({ ...point }));
-      state.exportObjectUrl = null;
-      state.status = 'uploading';
-      state.objectUrl = URL.createObjectURL(file);
-      elements.videoPlayer.src = state.objectUrl;
-      elements.emptySource.classList.add('hidden');
-      elements.sourceName.textContent = file.name;
-      elements.sourceDetail.textContent = `${(file.size / 1024 / 1024).toFixed(1)} MB · 正在读取`;
-      elements.exportResult.classList.remove('visible');
-      renderAll();
+    // ==========================================
+    // 1. Custom HTML5 Video Player Engine & HUD
+    // ==========================================
+    function triggerCenterFeedback(iconName) {
+      elements.centerFeedbackIcon.setAttribute('data-lucide', iconName);
+      refreshIcons();
+      elements.centerFeedback.classList.remove('show');
+      void elements.centerFeedback.offsetWidth; // trigger reflow
+      elements.centerFeedback.classList.add('show');
+      clearTimeout(triggerCenterFeedback.timer);
+      triggerCenterFeedback.timer = setTimeout(() => {
+        elements.centerFeedback.classList.remove('show');
+      }, 550);
     }
 
-    async function handleFile(file) {
-      if (!file) return;
-      const suffix = file.name.split('.').pop().toLowerCase();
-      if (!['mp4', 'mov', 'mkv', 'm4v', 'avi', 'webm'].includes(suffix)) {
-        showToast('请选择 MP4、MOV、MKV、M4V、AVI 或 WebM 文件', 'error');
+    function showHud() {
+      elements.hudTop.classList.remove('hud-hidden');
+      elements.hudBottom.classList.remove('hud-hidden');
+      resetHudTimer();
+    }
+
+    function hideHud() {
+      if (!elements.videoPlayer.paused) {
+        elements.hudTop.classList.add('hud-hidden');
+        elements.hudBottom.classList.add('hud-hidden');
+        elements.speedMenu.classList.remove('open');
+      }
+    }
+
+    function resetHudTimer() {
+      clearTimeout(state.hudTimer);
+      if (!elements.videoPlayer.paused) {
+        state.hudTimer = setTimeout(hideHud, 3500);
+      }
+    }
+
+    function togglePlay() {
+      if (!elements.videoPlayer.src) return;
+      if (elements.videoPlayer.paused) {
+        elements.videoPlayer.play().catch(() => {});
+        triggerCenterFeedback('play');
+        resetHudTimer();
+      } else {
+        elements.videoPlayer.pause();
+        triggerCenterFeedback('pause');
+        showHud();
+      }
+      updatePlayPauseButton();
+    }
+
+    function updatePlayPauseButton() {
+      const isPaused = elements.videoPlayer.paused;
+      elements.hudPlayIcon.setAttribute('data-lucide', isPaused ? 'play' : 'pause');
+      elements.playRallyPillIcon.setAttribute('data-lucide', isPaused ? 'play' : 'pause');
+      refreshIcons();
+    }
+
+    function seekRelative(deltaSec) {
+      if (!state.duration) return;
+      const target = Math.max(0, Math.min(state.duration, elements.videoPlayer.currentTime + deltaSec));
+      elements.videoPlayer.currentTime = target;
+      triggerCenterFeedback(deltaSec > 0 ? 'fast-forward' : 'rewind');
+      updatePlayheadUI();
+    }
+
+    function stepFrame(frames) {
+      const fps = 30;
+      elements.videoPlayer.pause();
+      updatePlayPauseButton();
+      seekRelative(frames / fps);
+    }
+
+    // Double-tap & Tap gestures on Player
+    let lastTapTime = 0;
+    let lastTapSide = null;
+    function handleTapZone(side) {
+      const now = Date.now();
+      if (now - lastTapTime < 320 && lastTapSide === side) {
+        // Double tap
+        lastTapTime = 0;
+        seekRelative(side === 'left' ? -2.0 : 2.0);
+      } else {
+        // Single tap
+        lastTapTime = now;
+        lastTapSide = side;
+        setTimeout(() => {
+          if (Date.now() - lastTapTime >= 300 && lastTapTime !== 0) {
+            if (elements.hudTop.classList.contains('hud-hidden')) {
+              showHud();
+            } else {
+              hideHud();
+            }
+          }
+        }, 310);
+      }
+    }
+
+    // ==========================================
+    // 2. Playback & Core Rally Editing Engine
+    // ==========================================
+    // Play a rally from start
+    function playSelectedRally(index = state.selectedRallyIndex) {
+      if (index === null || !state.rallies[index]) return;
+      state.selectedRallyIndex = index;
+      const rally = state.rallies[index];
+      state.rallyPlaybackEnd = rally.end;
+      elements.videoPlayer.currentTime = rally.start;
+      elements.videoPlayer.play().catch(() => {});
+      updatePlayPauseButton();
+      renderAll();
+      scrollToTime(rally.start, true);
+    }
+
+    // CRITICAL REQUIREMENT:
+    // 播放回合的时候可以延长、删减时间（不要重头播放）
+    function adjustSelectedRallyEnd(deltaSec) {
+      const idx = state.selectedRallyIndex;
+      if (idx === null || !state.rallies[idx] || !state.duration) return;
+      const rally = state.rallies[idx];
+
+      const newEnd = Math.min(state.duration, Math.max(rally.start + 0.3, rally.end + deltaSec));
+      const deltaApplied = Number((newEnd - rally.end).toFixed(2));
+      rally.end = Number(newEnd.toFixed(2));
+
+      // 核心：动态顺延播放哨兵，绝不重置 currentTime！
+      if (state.rallyPlaybackEnd !== null) {
+        state.rallyPlaybackEnd = rally.end;
+        // 如果当前正好在原终点处暂停了，或者用户在调整后想立刻看到延伸内容，顺畅继续播放
+        if (elements.videoPlayer.paused && elements.videoPlayer.currentTime >= rally.end - 0.2) {
+          elements.videoPlayer.play().catch(() => {});
+          updatePlayPauseButton();
+        }
+      }
+
+      renderTimeline();
+      renderFineTuneBar();
+      renderRallyCardsSheet();
+      showToast(`终点已调整至 ${formatTime(rally.end)} (${deltaSec > 0 ? '+' : ''}${deltaSec}s)`);
+    }
+
+    function adjustSelectedRallyStart(deltaSec) {
+      const idx = state.selectedRallyIndex;
+      if (idx === null || !state.rallies[idx] || !state.duration) return;
+      const rally = state.rallies[idx];
+
+      const newStart = Math.max(0, Math.min(rally.end - 0.3, rally.start + deltaSec));
+      rally.start = Number(newStart.toFixed(2));
+
+      // 起点微调：如果播放进度在当前新起点之后，保持播放；若播放头被移到新起点之前，才温和拉回到新起点
+      if (elements.videoPlayer.currentTime < rally.start) {
+        elements.videoPlayer.currentTime = rally.start;
+      }
+
+      renderTimeline();
+      renderFineTuneBar();
+      renderRallyCardsSheet();
+      showToast(`起点已调整至 ${formatTime(rally.start)} (${deltaSec > 0 ? '+' : ''}${deltaSec}s)`);
+    }
+
+    // Add Rally at current playhead
+    function addRallyAtPlayhead() {
+      if (!state.duration) return;
+      const cur = elements.videoPlayer.currentTime || 0;
+      const start = Math.max(0, Math.min(state.duration - 0.6, cur));
+      const end = Math.min(state.duration, start + 4.0);
+
+      const newRally = {
+        id: Date.now(),
+        start: Number(start.toFixed(2)),
+        end: Number(end.toFixed(2)),
+        confidence: 1.0,
+      };
+
+      state.rallies.push(newRally);
+      state.rallies.sort((a, b) => a.start - b.start);
+      state.selectedRallyIndex = state.rallies.findIndex(r => r.id === newRally.id);
+
+      renderAll();
+      showToast(`已在 ${formatTime(start)} 添加新回合`);
+    }
+
+    // Delete selected rally
+    function deleteSelectedRally() {
+      const idx = state.selectedRallyIndex;
+      if (idx === null || !state.rallies[idx]) return;
+      state.rallies.splice(idx, 1);
+      state.selectedRallyIndex = state.rallies.length ? Math.min(idx, state.rallies.length - 1) : null;
+      renderAll();
+      showToast('已删除当前回合');
+    }
+
+    // Split rally at playhead
+    function splitSelectedRally() {
+      const idx = state.selectedRallyIndex;
+      if (idx === null || !state.rallies[idx]) return;
+      const rally = state.rallies[idx];
+      const cur = elements.videoPlayer.currentTime;
+      if (cur <= rally.start + 0.3 || cur >= rally.end - 0.3) {
+        showToast('请将播放头移到当前回合内部再拆分', true);
+        return;
+      }
+      const right = {
+        id: Date.now(),
+        start: Number(cur.toFixed(2)),
+        end: rally.end,
+        confidence: rally.confidence ?? 1,
+      };
+      rally.end = Number(cur.toFixed(2));
+      state.rallies.splice(idx + 1, 0, right);
+      state.selectedRallyIndex = idx + 1;
+      renderAll();
+      showToast('已在播放头处成功拆分');
+    }
+
+    // Merge adjacent rallies (< 1.0s gap)
+    function mergeAdjacentRallies() {
+      if (state.rallies.length < 2) return;
+      const sorted = [...state.rallies].sort((a, b) => a.start - b.start);
+      const merged = [sorted[0]];
+      let mergedCount = 0;
+      for (let i = 1; i < sorted.length; i++) {
+        const prev = merged[merged.length - 1];
+        const curr = sorted[i];
+        if (curr.start - prev.end <= 1.0) {
+          prev.end = Math.max(prev.end, curr.end);
+          prev.confidence = Math.min(prev.confidence ?? 1, curr.confidence ?? 1);
+          mergedCount++;
+        } else {
+          merged.push(curr);
+        }
+      }
+      state.rallies = merged;
+      state.selectedRallyIndex = null;
+      renderAll();
+      showToast(mergedCount > 0 ? `已合并 ${mergedCount} 处碎片回合` : '未发现间隔小于 1.0s 的相邻碎片');
+    }
+
+    // ==========================================
+    // 3. Tactile Mobile Timeline & Zoom
+    // ==========================================
+    function getTimelineWidthPx() {
+      const viewW = elements.timelineViewport.clientWidth || 360;
+      return Math.max(viewW, viewW * state.timelineZoom);
+    }
+
+    function timeToPx(t) {
+      if (!state.duration) return 0;
+      return (t / state.duration) * getTimelineWidthPx();
+    }
+
+    function pxToTime(px) {
+      if (!state.duration) return 0;
+      const ratio = Math.max(0, Math.min(1, px / getTimelineWidthPx()));
+      return ratio * state.duration;
+    }
+
+    function scrollToTime(t, smooth = false) {
+      if (!state.duration) return;
+      const px = timeToPx(t);
+      const viewW = elements.timelineViewport.clientWidth || 360;
+      const targetScroll = Math.max(0, px - viewW / 2);
+      elements.timelineViewport.scrollTo({
+        left: targetScroll,
+        behavior: smooth ? 'smooth' : 'auto'
+      });
+    }
+
+    function setZoom(newZoom) {
+      const clamped = Math.max(1.0, Math.min(16.0, Number(newZoom.toFixed(1))));
+      if (clamped === state.timelineZoom) return;
+      const curTime = elements.videoPlayer.currentTime || 0;
+      state.timelineZoom = clamped;
+      elements.zoomLevelText.textContent = `${Math.round(clamped * 100)}%`;
+      renderTimeline();
+      scrollToTime(curTime, false);
+    }
+
+    function renderTimelineRuler() {
+      const fullW = getTimelineWidthPx();
+      elements.timelineCanvas.style.width = `${fullW}px`;
+      if (!state.duration) {
+        elements.timelineRuler.innerHTML = '';
+        return;
+      }
+      const visibleSec = state.duration / state.timelineZoom;
+      // Step candidates
+      const steps = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300];
+      const targetStep = Math.max(0.5, visibleSec / 7);
+      const step = steps.find(s => s >= targetStep) || 300;
+
+      let html = '';
+      for (let t = 0; t <= state.duration; t += step) {
+        const x = (t / state.duration) * fullW;
+        html += `
+          <div class="ruler-tick major" style="left: ${x}px;"></div>
+          <div class="ruler-label" style="left: ${x}px;">${formatTime(t, false)}</div>
+        `;
+      }
+      elements.timelineRuler.innerHTML = html;
+    }
+
+    function renderTimeline() {
+      renderTimelineRuler();
+      if (!state.duration) {
+        elements.ralliesContainer.innerHTML = '';
+        return;
+      }
+      const fullW = getTimelineWidthPx();
+
+      // Render Rally Blocks
+      elements.ralliesContainer.innerHTML = state.rallies.map((rally, idx) => {
+        const left = (rally.start / state.duration) * fullW;
+        const width = Math.max(6, ((rally.end - rally.start) / state.duration) * fullW);
+        const isSelected = state.selectedRallyIndex === idx;
+        const isLowConf = (rally.confidence ?? 1) < 0.8;
+        const dur = (rally.end - rally.start).toFixed(1);
+
+        return `
+          <div class="rally-block${isSelected ? ' selected' : ''}${isLowConf ? ' low-confidence' : ''}"
+               data-rally-idx="${idx}"
+               style="left: ${left}px; width: ${width}px;">
+            <div class="rally-handle start-handle" data-handle="start" data-rally-idx="${idx}">
+              <div class="handle-pill"></div>
+            </div>
+            <span class="rally-label">#${idx + 1} (${dur}s)</span>
+            <div class="rally-handle end-handle" data-handle="end" data-rally-idx="${idx}">
+              <div class="handle-pill"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Mini scrub highlights on player
+      elements.miniScrubRallies.innerHTML = state.rallies.map(r => {
+        const l = (r.start / state.duration) * 100;
+        const w = ((r.end - r.start) / state.duration) * 100;
+        const isLow = (r.confidence ?? 1) < 0.8;
+        return `<div class="mini-rally-mark${isLow ? ' low-conf' : ''}" style="left: ${l}%; width: ${w}%;"></div>`;
+      }).join('');
+
+      // Add Drag Listeners to Rally Handles
+      elements.ralliesContainer.querySelectorAll('.rally-handle').forEach(handle => {
+        handle.addEventListener('pointerdown', e => {
+          e.stopPropagation();
+          const type = handle.dataset.handle;
+          const idx = Number(handle.dataset.rallyIdx);
+          const rally = state.rallies[idx];
+          state.isDraggingRallyHandle = {
+            type,
+            index: idx,
+            startX: e.clientX,
+            initVal: type === 'start' ? rally.start : rally.end,
+          };
+          handle.setPointerCapture(e.pointerId);
+        });
+      });
+
+      // Add Click Listeners to Rally Blocks
+      elements.ralliesContainer.querySelectorAll('.rally-block').forEach(block => {
+        block.addEventListener('click', e => {
+          if (e.target.closest('.rally-handle')) return;
+          const idx = Number(block.dataset.rallyIdx);
+          state.selectedRallyIndex = idx;
+          renderAll();
+        });
+      });
+
+      updatePlayheadUI();
+    }
+
+    // Pointer Drag on Rally Handles
+    document.addEventListener('pointermove', e => {
+      if (!state.isDraggingRallyHandle || !state.duration) return;
+      const drag = state.isDraggingRallyHandle;
+      const rally = state.rallies[drag.index];
+      if (!rally) return;
+
+      const deltaPx = e.clientX - drag.startX;
+      const deltaTime = (deltaPx / getTimelineWidthPx()) * state.duration;
+
+      if (drag.type === 'start') {
+        const nextStart = Math.max(0, Math.min(rally.end - 0.25, drag.initVal + deltaTime));
+        rally.start = Number(nextStart.toFixed(2));
+      } else {
+        const nextEnd = Math.min(state.duration, Math.max(rally.start + 0.25, drag.initVal + deltaTime));
+        rally.end = Number(nextEnd.toFixed(2));
+        if (state.rallyPlaybackEnd !== null) {
+          state.rallyPlaybackEnd = rally.end;
+        }
+      }
+      renderTimeline();
+      renderFineTuneBar();
+    });
+
+    document.addEventListener('pointerup', e => {
+      if (state.isDraggingRallyHandle) {
+        state.isDraggingRallyHandle = null;
+        renderAll();
+      }
+      if (state.courtDragIndex !== null) {
+        state.courtDragIndex = null;
+      }
+      if (state.isScrubbingMini) {
+        state.isScrubbingMini = false;
+      }
+    });
+
+    // Timeline Click to Seek
+    elements.timelineViewport.addEventListener('click', e => {
+      if (e.target.closest('.rally-block')) return;
+      const rect = elements.timelineCanvas.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const targetTime = pxToTime(clickX);
+      elements.videoPlayer.currentTime = targetTime;
+      updatePlayheadUI();
+    });
+
+    // Touch Pinch-to-Zoom on Timeline
+    let initialPinchDist = null;
+    let initialPinchZoom = 1;
+    elements.timelineViewport.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
+        initialPinchDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        initialPinchZoom = state.timelineZoom;
+      }
+    }, { passive: true });
+
+    elements.timelineViewport.addEventListener('touchmove', e => {
+      if (e.touches.length === 2 && initialPinchDist) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const ratio = dist / initialPinchDist;
+        setZoom(initialPinchZoom * ratio);
+      }
+    }, { passive: true });
+
+    elements.timelineViewport.addEventListener('touchend', () => {
+      initialPinchDist = null;
+    });
+
+    // Update needle and times
+    function updatePlayheadUI() {
+      const cur = elements.videoPlayer.currentTime || 0;
+      elements.curTimeStr.textContent = formatTime(cur, true);
+      elements.durTimeStr.textContent = formatTime(state.duration, false);
+
+      if (state.duration > 0) {
+        const pct = (cur / state.duration) * 100;
+        elements.miniScrubFill.style.width = `${pct}%`;
+        elements.timelineProgressLayer.style.width = `${pct}%`;
+        elements.playheadNeedle.style.left = `${timeToPx(cur)}px`;
+      }
+    }
+
+    // Mini Scrub Dragging on Video HUD
+    function handleMiniScrub(e) {
+      if (!state.duration) return;
+      const rect = elements.miniScrubBox.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+      elements.videoPlayer.currentTime = ratio * state.duration;
+      updatePlayheadUI();
+    }
+    elements.miniScrubBox.addEventListener('pointerdown', e => {
+      state.isScrubbingMini = true;
+      handleMiniScrub(e);
+      elements.miniScrubBox.setPointerCapture(e.pointerId);
+    });
+    elements.miniScrubBox.addEventListener('pointermove', e => {
+      if (state.isScrubbingMini) handleMiniScrub(e);
+    });
+
+    // ==========================================
+    // 4. Fine-Tune Bar & Key Buttons
+    // ==========================================
+    function renderFineTuneBar() {
+      const idx = state.selectedRallyIndex;
+      const hasRally = idx !== null && Boolean(state.rallies[idx]);
+
+      elements.tuneStartMinus.disabled = !hasRally;
+      elements.tuneStartPlus.disabled = !hasRally;
+      elements.tuneEndMinus.disabled = !hasRally;
+      elements.tuneEndPlus.disabled = !hasRally;
+      elements.btnDeleteRally.disabled = !hasRally;
+      elements.btnSplitRally.disabled = !hasRally;
+      elements.btnMergeRallies.disabled = state.rallies.length < 2;
+      elements.btnOpenExportSheet.disabled = state.rallies.length === 0;
+
+      if (hasRally) {
+        const r = state.rallies[idx];
+        const isLow = (r.confidence ?? 1) < 0.8;
+        elements.activeRallyLabel.className = `active-rally-tag${isLow ? ' amber' : ''}`;
+        elements.activeRallyLabel.innerHTML = `
+          <i data-lucide="scissors"></i>
+          <span>回合 #${idx + 1} (${formatTime(r.start)} ~ ${formatTime(r.end)} · ${(r.end - r.start).toFixed(1)}s)</span>
+        `;
+        elements.playRallyPillText.textContent = `播放 #${idx + 1}`;
+      } else {
+        elements.activeRallyLabel.className = 'active-rally-tag empty';
+        elements.activeRallyLabel.innerHTML = `<i data-lucide="info"></i><span>未选择回合（点击时间轴选择或点击+回合）</span>`;
+        elements.playRallyPillText.textContent = '播放视频';
+      }
+
+      elements.rallyCountText.textContent = `回合 (${state.rallies.length})`;
+      refreshIcons();
+    }
+
+    // ==========================================
+    // 5. Bottom Sheets: Rally List & Export
+    // ==========================================
+    function openRallySheet() {
+      renderRallyCardsSheet();
+      elements.rallySheetBackdrop.classList.add('open');
+      elements.rallySheet.classList.add('open');
+    }
+    function closeRallySheet() {
+      elements.rallySheetBackdrop.classList.remove('open');
+      elements.rallySheet.classList.remove('open');
+    }
+
+    function renderRallyCardsSheet() {
+      const totalCutSec = state.rallies.reduce((sum, r) => sum + Math.max(0, r.end - r.start), 0);
+      const reduction = state.duration > 0 ? Math.max(0, Math.round((1 - totalCutSec / state.duration) * 100)) : 0;
+      elements.rallyStatsSummary.textContent = `共 ${state.rallies.length} 个回合 · 预计剪出 ${formatTime(totalCutSec, false)} (精简 ${reduction}%)`;
+
+      if (state.rallies.length === 0) {
+        elements.rallyCardsList.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 24px 0;">暂无回合，请标定球场后开始分析或点击“+回合”</div>`;
         return;
       }
 
-      resetForFile(file);
+      elements.rallyCardsList.innerHTML = state.rallies.map((rally, idx) => {
+        const isSel = state.selectedRallyIndex === idx;
+        const dur = (rally.end - rally.start).toFixed(1);
+        const isLow = (rally.confidence ?? 1) < 0.8;
+
+        return `
+          <div class="rally-card${isSel ? ' selected' : ''}" data-card-idx="${idx}">
+            <span class="rally-card-idx">${idx + 1}</span>
+            <div class="rally-card-main">
+              <div class="rally-card-times">${formatTime(rally.start)} → ${formatTime(rally.end)}</div>
+              <div class="rally-card-meta">
+                <span>时长 ${dur}s</span>
+                <span class="conf-badge${isLow ? ' low' : ''}">${isLow ? '低置信度' : '正常回合'}</span>
+              </div>
+            </div>
+            <div class="rally-card-actions">
+              <button class="card-act-btn play" data-action="play" data-card-idx="${idx}" title="播放此段"><i data-lucide="play"></i></button>
+              <button class="card-act-btn delete" data-action="delete" data-card-idx="${idx}" title="删除此段"><i data-lucide="trash-2"></i></button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      elements.rallyCardsList.querySelectorAll('.rally-card').forEach(card => {
+        card.addEventListener('click', e => {
+          const idx = Number(card.dataset.cardIdx);
+          const btn = e.target.closest('.card-act-btn');
+          if (btn) {
+            const action = btn.dataset.action;
+            if (action === 'play') {
+              playSelectedRally(idx);
+              closeRallySheet();
+            } else if (action === 'delete') {
+              state.rallies.splice(idx, 1);
+              if (state.selectedRallyIndex === idx) state.selectedRallyIndex = null;
+              renderAll();
+            }
+          } else {
+            state.selectedRallyIndex = idx;
+            elements.videoPlayer.currentTime = state.rallies[idx].start;
+            renderAll();
+            closeRallySheet();
+          }
+        });
+      });
+      refreshIcons();
+    }
+
+    function openExportSheet() {
+      elements.exportMetaSummary.textContent = `共 ${state.rallies.length} 个回合 · 即将进行高画质剪辑编码`;
+      elements.exportResultBox.style.display = 'none';
+      elements.exportSheetBackdrop.classList.add('open');
+      elements.exportSheet.classList.add('open');
+    }
+    function closeExportSheet() {
+      elements.exportSheetBackdrop.classList.remove('open');
+      elements.exportSheet.classList.remove('open');
+    }
+
+    // ==========================================
+    // 6. Court Calibration
+    // ==========================================
+    function updateCourtBounds() {
+      if (!elements.videoPlayer.videoWidth || !elements.videoStage.clientWidth) return;
+      const stageW = elements.videoStage.clientWidth;
+      const stageH = elements.videoStage.clientHeight;
+      const vAspect = elements.videoPlayer.videoWidth / elements.videoPlayer.videoHeight;
+      const sAspect = stageW / stageH;
+      let w = stageW, h = stageH, l = 0, t = 0;
+      if (vAspect > sAspect) {
+        h = stageW / vAspect;
+        t = (stageH - h) / 2;
+      } else {
+        w = stageH * vAspect;
+        l = (stageW - w) / 2;
+      }
+      Object.assign(elements.courtOverlay.style, {
+        left: `${l}px`, top: `${t}px`, width: `${w}px`, height: `${h}px`
+      });
+    }
+
+    function renderCourtOverlay() {
+      elements.courtPolygon.setAttribute('points', state.courtRoi.map(p => `${p.x * 1000},${p.y * 1000}`).join(' '));
+      elements.courtHandlesGroup.innerHTML = state.courtRoi.map((p, i) => `
+        <g data-court-handle="${i}">
+          <circle class="court-handle-hit" cx="${p.x * 1000}" cy="${p.y * 1000}" r="45"></circle>
+          <circle class="court-handle" cx="${p.x * 1000}" cy="${p.y * 1000}" r="16"></circle>
+        </g>
+      `).join('');
+
+      elements.courtHandlesGroup.querySelectorAll('[data-court-handle]').forEach(handle => {
+        handle.addEventListener('pointerdown', e => {
+          e.preventDefault();
+          state.courtDragIndex = Number(handle.dataset.courtHandle);
+          elements.courtOverlay.setPointerCapture(e.pointerId);
+        });
+      });
+      updateCourtBounds();
+    }
+
+    elements.courtOverlay.addEventListener('pointermove', e => {
+      if (state.courtDragIndex === null) return;
+      const rect = elements.courtOverlay.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const point = state.courtRoi[state.courtDragIndex];
+      point.x = Math.max(0.01, Math.min(0.99, (e.clientX - rect.left) / rect.width));
+      point.y = Math.max(0.01, Math.min(0.99, (e.clientY - rect.top) / rect.height));
+      renderCourtOverlay();
+    });
+
+    function openCourtCalibration() {
+      elements.videoPlayer.pause();
+      updatePlayPauseButton();
+      elements.courtOverlay.classList.add('visible');
+      elements.courtToolsBar.classList.add('visible');
+      renderCourtOverlay();
+    }
+
+    function closeCourtCalibration() {
+      elements.courtOverlay.classList.remove('visible');
+      elements.courtToolsBar.classList.remove('visible');
+      state.courtDragIndex = null;
+    }
+
+    // ==========================================
+    // 7. Video Loading, Upload & Analysis API
+    // ==========================================
+    async function handleFileInput(file) {
+      if (!file) return;
+      clearInterval(state.pollTimer);
+      if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+      if (state.exportBlobUrl) URL.revokeObjectURL(state.exportBlobUrl);
+
+      state.file = file;
+      state.taskId = null;
+      state.duration = 0;
+      state.rallies = [];
+      state.selectedRallyIndex = null;
+      state.rallyPlaybackEnd = null;
+      state.objectUrl = URL.createObjectURL(file);
+
+      elements.videoPlayer.src = state.objectUrl;
+      elements.emptyStage.classList.add('hidden');
+      elements.hudVideoName.textContent = file.name;
+      setTaskBanner('正在上传视频至服务...', 'working', 0);
+
       try {
         const uploaded = await uploadVideo(file);
         state.taskId = uploaded.task_id;
         state.duration = Number(uploaded.duration) || elements.videoPlayer.duration || 0;
-        state.status = 'ready';
-        elements.sourceDetail.textContent = `${formatTime(state.duration)} · ${state.taskId}`;
+        setTaskBanner('上传完成，请标定球场后开始分析', 'success');
         renderAll();
         openCourtCalibration();
-      } catch (error) {
-        state.status = 'error';
-        setTaskBanner(error.message || '上传失败', 'error');
-        renderAll();
+      } catch (err) {
+        setTaskBanner(err.message || '视频上传失败', 'error');
+        showToast(err.message || '上传失败', true);
       }
     }
 
@@ -1151,614 +2354,96 @@
         const form = new FormData();
         form.append('file', file, file.name);
         xhr.open('POST', `${API_BASE}/api/v1/video/upload`);
-        xhr.upload.addEventListener('progress', event => {
-          if (!event.lengthComputable) return;
-          const percent = Math.round((event.loaded / event.total) * 100);
-          setTaskBanner(`正在上传 ${percent}%`, 'working', percent);
+        xhr.upload.addEventListener('progress', e => {
+          if (!e.lengthComputable) return;
+          const pct = Math.round((e.loaded / e.total) * 100);
+          setTaskBanner(`上传视频中 ${pct}%`, 'working', pct);
         });
         xhr.addEventListener('load', () => {
           let data = {};
-          try { data = JSON.parse(xhr.responseText || '{}'); } catch { /* no-op */ }
+          try { data = JSON.parse(xhr.responseText || '{}'); } catch {}
           if (xhr.status >= 200 && xhr.status < 300) resolve(data);
-          else reject(new Error(data.detail || `上传失败 (${xhr.status})`));
+          else reject(new Error(data.detail || `上传错误 (${xhr.status})`));
         });
         xhr.addEventListener('error', () => reject(new Error('无法连接后端服务')));
         xhr.send(form);
       });
     }
 
-    async function startAnalysis() {
+    async function triggerAiAnalysis() {
       closeCourtCalibration();
-      state.status = 'analyzing';
+      if (!state.taskId) return;
       state.rallies = [];
+      state.selectedRallyIndex = null;
       state.rallyPlaybackEnd = null;
+      setTaskBanner('AI 正在多模态分析发球与羽毛球轨迹...', 'working');
       renderAll();
-      setTaskBanner('正在分析目标球场的发球与羽毛球轨迹', 'working');
-      const response = await fetch(`${API_BASE}/api/v1/ai/analyze/${state.taskId}?background=true`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ court_roi: state.courtRoi }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || '分析任务启动失败');
-      await pollAnalysis();
-      clearInterval(state.pollTimer);
-      state.pollTimer = setInterval(pollAnalysis, 1400);
-    }
 
-    function applyAnalysisResult(data) {
-      state.duration = Number(data.original_duration) || state.duration;
-      state.rallies = (data.rallies || []).map((item, index) => ({
-        id: item.id || index + 1,
-        start: Number(item.start ?? item.start_time),
-        end: Math.min(state.duration || Infinity, Number(item.end ?? item.end_time)),
-        confidence: Number(item.confidence ?? 1),
-      })).filter(item => Number.isFinite(item.start) && Number.isFinite(item.end) && item.end > item.start);
-    }
-
-    async function pollAnalysis() {
       try {
-        const response = await fetch(`${API_BASE}/api/v1/ai/result/${state.taskId}`, { cache: 'no-store' });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.detail || '无法读取分析结果');
+        const res = await fetch(`${API_BASE}/api/v1/ai/analyze/${state.taskId}?background=true`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ court_roi: state.courtRoi }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '分析任务发起失败');
+
+        clearInterval(state.pollTimer);
+        state.pollTimer = setInterval(pollAiResult, 1400);
+        await pollAiResult();
+      } catch (err) {
+        setTaskBanner(err.message || 'AI 分析启动失败', 'error');
+        showToast(err.message, true);
+      }
+    }
+
+    async function pollAiResult() {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/ai/result/${state.taskId}`, { cache: 'no-store' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '无法获取识别进度');
+
         if (data.status === 'completed') {
           clearInterval(state.pollTimer);
-          applyAnalysisResult(data);
-          state.status = 'ready';
-          setTaskBanner(`识别完成，共 ${state.rallies.length} 个回合`, 'success');
-          setTimeout(() => { if (state.status === 'ready') hideTaskBanner(); }, 2600);
+          state.duration = Number(data.original_duration) || state.duration;
+          state.rallies = (data.rallies || []).map((item, idx) => ({
+            id: item.id || idx + 1,
+            start: Number(item.start ?? item.start_time),
+            end: Math.min(state.duration || Infinity, Number(item.end ?? item.end_time)),
+            confidence: Number(item.confidence ?? 1),
+          })).filter(r => r.end > r.start);
+
+          state.selectedRallyIndex = state.rallies.length ? 0 : null;
+          setTaskBanner(`AI 识别完成！提取到 ${state.rallies.length} 个精彩对战回合`, 'success');
+          setTimeout(hideTaskBanner, 3200);
           renderAll();
+          showToast(`成功识别出 ${state.rallies.length} 个回合`);
         } else if (data.status === 'failed') {
           clearInterval(state.pollTimer);
-          state.status = 'error';
-          setTaskBanner('录像分析失败，请确认文件可正常播放', 'error');
-          renderAll();
+          setTaskBanner('录像分析失败，建议检查视频清晰度与球场边界', 'error');
+          showToast('识别失败', true);
         }
-      } catch (error) {
+      } catch (err) {
         clearInterval(state.pollTimer);
-        state.status = 'error';
-        setTaskBanner(error.message, 'error');
-        renderAll();
+        setTaskBanner(err.message, 'error');
       }
     }
 
-    async function restoreTaskFromUrl() {
-      const params = new URLSearchParams(window.location.search);
-      const taskId = params.get('task')?.trim();
-      if (!taskId) return;
-
-      state.status = 'loading';
-      setTaskBanner('正在恢复已上传的录像', 'working');
-      renderControls();
-      try {
-        const taskResponse = await fetch(`${API_BASE}/api/v1/video/task/${encodeURIComponent(taskId)}`, { cache: 'no-store' });
-        const task = await taskResponse.json();
-        if (!taskResponse.ok) throw new Error(task.detail || '找不到指定的录像任务');
-
-        state.taskId = task.task_id;
-        state.duration = Number(task.duration) || 0;
-        state.rallyPlaybackEnd = null;
-        state.status = task.status === 'processing' ? 'analyzing' : 'ready';
-        elements.videoPlayer.src = task.video_url;
-        elements.emptySource.classList.add('hidden');
-        elements.sourceName.textContent = task.filename;
-        elements.sourceDetail.textContent = `${formatTime(state.duration)} · ${state.taskId}`;
-
-        const resultResponse = await fetch(`${API_BASE}/api/v1/ai/result/${encodeURIComponent(taskId)}`, { cache: 'no-store' });
-        const result = await resultResponse.json();
-        if (!resultResponse.ok) throw new Error(result.detail || '无法读取已有分析结果');
-
-        if (result.status === 'completed') {
-          applyAnalysisResult(result);
-          state.status = 'ready';
-          setTaskBanner(`已恢复 ${state.rallies.length} 个回合`, 'success');
-          setTimeout(() => { if (state.status === 'ready') hideTaskBanner(); }, 2600);
-        } else if (result.status === 'processing') {
-          state.status = 'analyzing';
-          setTaskBanner('正在分析目标球场的发球与羽毛球轨迹', 'working');
-          clearInterval(state.pollTimer);
-          state.pollTimer = setInterval(pollAnalysis, 1400);
-        } else if (result.status === 'failed') {
-          state.status = 'error';
-          setTaskBanner('上次录像分析失败，请重新标定球场', 'error');
-        } else {
-          state.status = 'ready';
-          hideTaskBanner();
-        }
-
-        renderAll();
-        if (params.get('calibrate') === '1' && state.status !== 'analyzing') {
-          openCourtCalibration();
-        }
-      } catch (error) {
-        state.status = 'error';
-        setTaskBanner(error.message || '恢复任务失败', 'error');
-        showToast(error.message || '恢复任务失败', 'error');
-        renderAll();
-      }
-    }
-
-    function normalizedRallies() {
-      return [...state.rallies]
-        .map((item, sourceIndex) => ({ ...item, sourceIndex, start: Math.max(0, item.start), end: Math.min(state.duration, item.end) }))
-        .filter(item => item.end > item.start)
-        .sort((a, b) => a.start - b.start);
-    }
-
-    function playRally(index) {
-      const rally = state.rallies[index];
-      if (!rally) return;
-
-      state.selectedRallyIndex = index;
-      const playbackEnd = Math.min(state.duration || rally.end, rally.end);
-      state.rallyPlaybackEnd = playbackEnd;
-      elements.videoPlayer.currentTime = rally.start;
-      elements.videoPlayer.play().catch(() => {
-        if (state.rallyPlaybackEnd === playbackEnd) state.rallyPlaybackEnd = null;
-      });
-      scrollTimelineToTime(rally.start, true);
-      renderTimeline();
-      renderControls();
-    }
-
-    function canvasWidthPx() {
-      const viewport = elements.timelineViewport?.clientWidth || 1;
-      return Math.max(viewport, viewport * state.timelineZoom);
-    }
-
-    function timeFromClientX(clientX) {
-      if (!state.duration) return 0;
-      const rect = elements.timelineCanvas.getBoundingClientRect();
-      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / Math.max(1, rect.width)));
-      return ratio * state.duration;
-    }
-
-    function chooseTickStep(visibleDuration) {
-      const candidates = [0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
-      const target = Math.max(0.5, visibleDuration / 8);
-      return candidates.find(step => step >= target) || 600;
-    }
-
-    function updateTimelineChrome() {
-      if (!elements.timelineCanvas) return;
-      elements.timelineCanvas.style.width = `${Math.max(100, state.timelineZoom * 100)}%`;
-      if (elements.timelineZoomLabel) {
-        elements.timelineZoomLabel.textContent = `${Math.round(state.timelineZoom * 100)}%`;
-      }
-      if (elements.timelineRangeLabel && state.duration) {
-        const viewport = elements.timelineViewport;
-        const canvas = elements.timelineCanvas;
-        const scroll = viewport.scrollLeft;
-        const viewW = viewport.clientWidth || 1;
-        const fullW = canvas.scrollWidth || 1;
-        const start = (scroll / fullW) * state.duration;
-        const end = ((scroll + viewW) / fullW) * state.duration;
-        elements.timelineRangeLabel.textContent = `可见 ${formatTime(start)} - ${formatTime(Math.min(state.duration, end))}`;
-      } else if (elements.timelineRangeLabel) {
-        elements.timelineRangeLabel.textContent = '可见 00:00 - 00:00';
-      }
-    }
-
-    function scrollTimelineToTime(time, center = false) {
-      if (!state.duration || !elements.timelineViewport) return;
-      const fullW = elements.timelineCanvas.scrollWidth || 1;
-      const viewW = elements.timelineViewport.clientWidth || 1;
-      const x = (Math.max(0, Math.min(state.duration, time)) / state.duration) * fullW;
-      const target = center ? x - viewW / 2 : x - viewW * 0.2;
-      elements.timelineViewport.scrollLeft = Math.max(0, Math.min(fullW - viewW, target));
-      updateTimelineChrome();
-    }
-
-    function setTimelineZoom(nextZoom, anchorClientX = null) {
-      if (!state.duration) {
-        state.timelineZoom = 1;
-        updateTimelineChrome();
-        return;
-      }
-      const viewport = elements.timelineViewport;
-      const prevZoom = state.timelineZoom;
-      const zoom = Math.max(TIMELINE_MIN_ZOOM, Math.min(TIMELINE_MAX_ZOOM, nextZoom));
-      if (Math.abs(zoom - prevZoom) < 0.001) return;
-
-      const rect = viewport.getBoundingClientRect();
-      const anchorX = anchorClientX == null ? rect.left + rect.width / 2 : anchorClientX;
-      const fullW = elements.timelineCanvas.scrollWidth || rect.width || 1;
-      const ratio = Math.max(0, Math.min(1, (viewport.scrollLeft + (anchorX - rect.left)) / fullW));
-
-      state.timelineZoom = zoom;
-      updateTimelineChrome();
-      renderTimeline();
-
-      const nextFullW = elements.timelineCanvas.scrollWidth || fullW;
-      viewport.scrollLeft = Math.max(0, ratio * nextFullW - (anchorX - rect.left));
-      updateTimelineChrome();
-    }
-
-    function renderTimeline() {
-      elements.timelineTrack.querySelectorAll('.segment').forEach(node => node.remove());
-      elements.timelineEmpty.style.display = state.rallies.length ? 'none' : 'grid';
-      updateTimelineChrome();
-      if (!state.duration) {
-        elements.timelineRuler.innerHTML = '';
-        elements.timelineProgress.style.left = '0px';
-        return;
-      }
-
-      const sorted = normalizedRallies();
-      sorted.forEach((rally, index) => {
-        const segment = document.createElement('div');
-        const selected = state.selectedRallyIndex === rally.sourceIndex ? ' selected' : '';
-        segment.className = `segment${rally.confidence < 0.72 ? ' low-confidence' : ''}${selected}`;
-        segment.dataset.index = String(rally.sourceIndex);
-        segment.style.left = `${(rally.start / state.duration) * 100}%`;
-        segment.style.width = `${Math.max(0.18, ((rally.end - rally.start) / state.duration) * 100)}%`;
-        segment.title = `回合 ${index + 1} · ${formatTime(rally.start, true)} - ${formatTime(rally.end, true)} · 置信度 ${Math.round(rally.confidence * 100)}% · 拖动手柄调整`;
-        const widthRatio = (rally.end - rally.start) / state.duration;
-        const showLabel = widthRatio * state.timelineZoom > 0.035;
-        segment.innerHTML = `
-          <span class="segment-handle start" data-handle="start"></span>
-          ${showLabel ? `<span class="segment-label">${String(index + 1).padStart(2, '0')}</span>` : ''}
-          <span class="segment-handle end" data-handle="end"></span>
-        `;
-        segment.addEventListener('pointerdown', beginSegmentDrag);
-        elements.timelineTrack.appendChild(segment);
-      });
-
-      const visibleDuration = state.duration / Math.max(1, state.timelineZoom);
-      const step = chooseTickStep(visibleDuration);
-      const majorEvery = step >= 60 ? 2 : 5;
-      const ticks = [];
-      for (let t = 0, i = 0; t <= state.duration + 0.001; t += step, i += 1) {
-        const left = (Math.min(t, state.duration) / state.duration) * 100;
-        const major = i % majorEvery === 0 || t === 0 || t >= state.duration - 0.001;
-        ticks.push(`<div class="ruler-tick${major ? ' major' : ''}" style="left:${left}%">${major ? `<span>${formatTime(t)}</span>` : ''}</div>`);
-      }
-      elements.timelineRuler.innerHTML = ticks.join('');
-      updatePlayhead();
-    }
-
-    function updatePlayhead() {
-      if (!state.duration) {
-        elements.timelineProgress.style.left = '0px';
-        return;
-      }
-      const ratio = Math.max(0, Math.min(1, elements.videoPlayer.currentTime / state.duration));
-      elements.timelineProgress.style.left = `${ratio * 100}%`;
-      elements.timelineProgress.style.width = '2px';
-    }
-
-    function beginSegmentDrag(event) {
-      if (!state.duration) return;
-      if (event.button != null && event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      const index = Number(event.currentTarget.dataset.index);
-      const rally = state.rallies[index];
-      state.selectedRallyIndex = index;
-      state.drag = {
-        index,
-        mode: event.target.dataset.handle || 'move',
-        startX: event.clientX,
-        originalStart: rally.start,
-        originalEnd: rally.end,
-        moved: false,
-      };
-      event.currentTarget.classList.add('active');
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-      renderControls();
-    }
-
-    function moveSegment(event) {
-      if (!state.drag) return;
-      const rect = elements.timelineCanvas.getBoundingClientRect();
-      const delta = ((event.clientX - state.drag.startX) / Math.max(1, rect.width)) * state.duration;
-      if (Math.abs(delta) > 0.03) state.drag.moved = true;
-      const rally = state.rallies[state.drag.index];
-      const minDuration = 0.3;
-
-      if (state.drag.mode === 'start') {
-        rally.start = Math.max(0, Math.min(state.drag.originalEnd - minDuration, state.drag.originalStart + delta));
-      } else if (state.drag.mode === 'end') {
-        rally.end = Math.min(state.duration, Math.max(state.drag.originalStart + minDuration, state.drag.originalEnd + delta));
-      } else {
-        const duration = state.drag.originalEnd - state.drag.originalStart;
-        const nextStart = Math.max(0, Math.min(state.duration - duration, state.drag.originalStart + delta));
-        rally.start = nextStart;
-        rally.end = nextStart + duration;
-      }
-      renderTimeline();
-      syncRallyInputs(state.drag.index);
-      renderMetrics();
-    }
-
-    function finishSegmentDrag() {
-      if (!state.drag) return;
-      const drag = state.drag;
-      state.drag = null;
-      if (!drag.moved) {
-        playRally(drag.index);
-      }
-      renderAll();
-    }
-
-    function beginTimelinePan(event) {
-      if (!state.duration || state.drag) return;
-      if (event.target.closest('.segment')) return;
-      if (event.button != null && event.button !== 0) return;
-      state.timelinePan = {
-        startX: event.clientX,
-        scrollLeft: elements.timelineViewport.scrollLeft,
-        moved: false,
-        pointerId: event.pointerId,
-      };
-      elements.timelineViewport.classList.add('is-panning');
-      elements.timelineViewport.setPointerCapture?.(event.pointerId);
-    }
-
-    function moveTimelinePan(event) {
-      if (!state.timelinePan) return;
-      const dx = event.clientX - state.timelinePan.startX;
-      if (Math.abs(dx) > 3) state.timelinePan.moved = true;
-      elements.timelineViewport.scrollLeft = state.timelinePan.scrollLeft - dx;
-      updateTimelineChrome();
-    }
-
-    function finishTimelinePan(event) {
-      if (!state.timelinePan) return;
-      const pan = state.timelinePan;
-      state.timelinePan = null;
-      elements.timelineViewport.classList.remove('is-panning');
-      if (!pan.moved && state.duration) {
-        const time = timeFromClientX(event.clientX);
-        elements.videoPlayer.currentTime = time;
-        updatePlayhead();
-      }
-    }
-
-    function splitSelectedRallyAtPlayhead() {
-      const index = state.selectedRallyIndex;
-      if (index == null || !state.rallies[index] || !state.duration) return;
-      const rally = state.rallies[index];
-      const t = elements.videoPlayer.currentTime;
-      if (t <= rally.start + 0.25 || t >= rally.end - 0.25) {
-        showToast('请把播放头移到选中回合内部再拆分', 'error');
-        return;
-      }
-      const right = { id: Date.now(), start: t, end: rally.end, confidence: rally.confidence ?? 1 };
-      rally.end = t;
-      state.rallies.splice(index + 1, 0, right);
-      state.selectedRallyIndex = index + 1;
-      renderAll();
-      showToast('已在播放头处拆分回合');
-    }
-
-    function setSelectedStartAtPlayhead() {
-      const index = state.selectedRallyIndex;
-      if (index == null || !state.rallies[index] || !state.duration) return;
-      const rally = state.rallies[index];
-      const t = elements.videoPlayer.currentTime;
-      if (t >= rally.end - 0.2) {
-        showToast('起点不能大于或过于接近终点', 'error');
-        return;
-      }
-      rally.start = Math.max(0, Number(t.toFixed(2)));
-      renderAll();
-      showToast(`已将回合起点设为 ${formatTime(t, true)}`);
-    }
-
-    function setSelectedEndAtPlayhead() {
-      const index = state.selectedRallyIndex;
-      if (index == null || !state.rallies[index] || !state.duration) return;
-      const rally = state.rallies[index];
-      const t = elements.videoPlayer.currentTime;
-      if (t <= rally.start + 0.2) {
-        showToast('终点不能小于或过于接近起点', 'error');
-        return;
-      }
-      rally.end = Math.min(state.duration, Number(t.toFixed(2)));
-      renderAll();
-      showToast(`已将回合终点设为 ${formatTime(t, true)}`);
-    }
-
-    function mergeAdjacentRallies() {
-      if (state.rallies.length < 2) return;
-      const sorted = [...state.rallies].sort((a, b) => a.start - b.start);
-      const merged = [sorted[0]];
-      let count = 0;
-      for (let i = 1; i < sorted.length; i++) {
-        const prev = merged[merged.length - 1];
-        const curr = sorted[i];
-        if (curr.start - prev.end <= 1.0) {
-          prev.end = Math.max(prev.end, curr.end);
-          prev.confidence = Math.min(prev.confidence ?? 1, curr.confidence ?? 1);
-          count++;
-        } else {
-          merged.push(curr);
-        }
-      }
-      state.rallies = merged;
-      state.selectedRallyIndex = null;
-      renderAll();
-      showToast(count > 0 ? `已自动合并 ${count} 处相邻碎片回合` : '未发现间隔小于 1.0s 的相邻碎片回合');
-    }
-
-    function toggleSmartSkip() {
-      state.smartSkip = !state.smartSkip;
-      if (elements.smartSkipButton) {
-        elements.smartSkipButton.classList.toggle('active', state.smartSkip);
-      }
-      showToast(state.smartSkip ? '已开启跳过死球模式 (连续播放有效回合)' : '已关闭跳过死球模式');
-    }
-
-    function toggleLoopRally() {
-      if (state.selectedRallyIndex == null) {
-        showToast('请先在时间轴上选择一个回合', 'error');
-        return;
-      }
-      state.loopRally = !state.loopRally;
-      if (elements.loopRallyButton) {
-        elements.loopRallyButton.classList.toggle('active', state.loopRally);
-      }
-      showToast(state.loopRally ? '已开启单回合循环播放' : '已关闭单回合循环');
-    }
-
-    function deleteSelectedRally() {
-      const index = state.selectedRallyIndex;
-      if (index == null || !state.rallies[index]) return;
-      state.rallies.splice(index, 1);
-      state.selectedRallyIndex = null;
-      if (state.loopRally) {
-        state.loopRally = false;
-        elements.loopRallyButton?.classList.remove('active');
-      }
-      renderAll();
-    }
-
-    function syncRallyInputs(index) {
-      const row = elements.rallyRows.querySelector(`[data-row-index="${index}"]`);
-      if (!row) return;
-      const rally = state.rallies[index];
-      row.querySelector('[data-field="start"]').value = rally.start.toFixed(2);
-      row.querySelector('[data-field="end"]').value = rally.end.toFixed(2);
-      row.querySelector('.duration-cell').textContent = `${(rally.end - rally.start).toFixed(1)}s`;
-    }
-
-    function renderRallyRows() {
-      if (!state.rallies.length) {
-        elements.rallyRows.innerHTML = '<div class="list-empty">暂无回合</div>';
-        return;
-      }
-      const sorted = normalizedRallies();
-      elements.rallyRows.innerHTML = sorted.map((rally, order) => {
-        const index = rally.sourceIndex;
-        const selected = state.selectedRallyIndex === index ? ' selected' : '';
-        return `
-          <div class="rally-row${selected}" data-row-index="${index}">
-            <span class="rally-index">${String(order + 1).padStart(2, '0')}</span>
-            <input class="time-input" type="number" min="0" max="${state.duration}" step="0.1" value="${rally.start.toFixed(2)}" data-field="start" aria-label="回合 ${order + 1} 开始时间">
-            <input class="time-input" type="number" min="0" max="${state.duration}" step="0.1" value="${rally.end.toFixed(2)}" data-field="end" aria-label="回合 ${order + 1} 结束时间">
-            <span class="duration-cell">${(rally.end - rally.start).toFixed(1)}s</span>
-            <span class="row-actions">
-              <button class="button button-quiet button-icon play-rally" title="播放回合" aria-label="播放回合 ${order + 1}"><i data-lucide="play"></i></button>
-              <button class="button button-quiet button-icon button-danger delete-rally" title="删除回合" aria-label="删除回合 ${order + 1}"><i data-lucide="trash-2"></i></button>
-            </span>
-          </div>`;
-      }).join('');
-
-      elements.rallyRows.querySelectorAll('.rally-row').forEach(row => {
-        const index = Number(row.dataset.rowIndex);
-        row.addEventListener('click', event => {
-          if (event.target.closest('button, input')) return;
-          state.selectedRallyIndex = index;
-          scrollTimelineToTime(state.rallies[index].start, true);
-          renderTimeline();
-          renderRallyRows();
-          renderControls();
-        });
-        row.querySelectorAll('.time-input').forEach(input => input.addEventListener('change', event => updateRallyTime(index, event.target.dataset.field, event.target.value)));
-        row.querySelector('.play-rally').addEventListener('click', () => {
-          playRally(index);
-        });
-        row.querySelector('.delete-rally').addEventListener('click', () => {
-          state.rallies.splice(index, 1);
-          if (state.selectedRallyIndex === index) state.selectedRallyIndex = null;
-          else if (state.selectedRallyIndex != null && state.selectedRallyIndex > index) state.selectedRallyIndex -= 1;
-          renderAll();
-        });
-      });
-      refreshIcons();
-    }
-
-    function updateRallyTime(index, field, rawValue) {
-      const value = Number(rawValue);
-      const rally = state.rallies[index];
-      if (!Number.isFinite(value)) return renderAll();
-      if (field === 'start') rally.start = Math.max(0, Math.min(value, rally.end - 0.3));
-      else rally.end = Math.min(state.duration, Math.max(value, rally.start + 0.3));
-      renderAll();
-    }
-
-    function renderMetrics() {
-      const rallies = normalizedRallies();
-      const selected = rallies.reduce((total, item) => total + item.end - item.start, 0);
-      const preBuffer = Number(document.getElementById('preBuffer').value) || 0;
-      const postBuffer = Number(document.getElementById('postBuffer').value) || 0;
-      const projected = rallies.map(item => ({
-        start: Math.max(0, item.start - preBuffer),
-        end: Math.min(state.duration, item.end + postBuffer),
-      })).reduce((merged, item) => {
-        const previous = merged[merged.length - 1];
-        if (previous && item.start <= previous.end) previous.end = Math.max(previous.end, item.end);
-        else merged.push({ ...item });
-        return merged;
-      }, []);
-      const projectedDuration = projected.reduce((total, item) => total + item.end - item.start, 0);
-      const reduction = state.duration ? Math.max(0, Math.round((1 - projectedDuration / state.duration) * 100)) : 0;
-      elements.originalDuration.textContent = formatTime(state.duration);
-      elements.selectedDuration.textContent = formatTime(projectedDuration);
-      elements.reductionRate.textContent = `${reduction}%`;
-      elements.exportSummary.textContent = state.rallies.length
-        ? `${state.rallies.length} 个回合 · ${formatTime(selected)} 净时长 · ${formatTime(projectedDuration)} 成片`
-        : '完成分析后即可导出';
-    }
-
-    function renderControls() {
-      const ready = Boolean(state.taskId && state.rallies.length && state.status !== 'uploading' && state.status !== 'analyzing' && state.status !== 'exporting');
-      elements.addRallyButton.disabled = !state.duration || !state.taskId;
-      elements.calibrateCourtButton.disabled = !state.taskId || ['uploading', 'analyzing', 'exporting'].includes(state.status);
-      elements.exportButton.disabled = !ready;
-      const hasSelection = state.selectedRallyIndex != null && Boolean(state.rallies[state.selectedRallyIndex]);
-      if (elements.splitRallyButton) elements.splitRallyButton.disabled = !hasSelection || !state.duration;
-      if (elements.deleteSelectedButton) elements.deleteSelectedButton.disabled = !hasSelection;
-      if (elements.smartSkipButton) {
-        elements.smartSkipButton.disabled = !state.rallies.length;
-        elements.smartSkipButton.classList.toggle('active', state.smartSkip);
-      }
-      if (elements.loopRallyButton) {
-        elements.loopRallyButton.disabled = !hasSelection;
-        elements.loopRallyButton.classList.toggle('active', state.loopRally);
-      }
-      if (elements.setStartButton) elements.setStartButton.disabled = !hasSelection || !state.duration;
-      if (elements.setEndButton) elements.setEndButton.disabled = !hasSelection || !state.duration;
-      if (elements.mergeAdjacentButton) elements.mergeAdjacentButton.disabled = state.rallies.length < 2;
-      if (elements.zoomInButton) elements.zoomInButton.disabled = !state.duration || state.timelineZoom >= TIMELINE_MAX_ZOOM;
-      if (elements.zoomOutButton) elements.zoomOutButton.disabled = !state.duration || state.timelineZoom <= TIMELINE_MIN_ZOOM;
-      if (elements.zoomFitButton) elements.zoomFitButton.disabled = !state.duration;
-      if (elements.scrollToPlayheadButton) elements.scrollToPlayheadButton.disabled = !state.duration;
-    }
-
-    function renderAll() {
-      renderTimeline();
-      renderRallyRows();
-      renderMetrics();
-      renderControls();
-    }
-
-    function addRally() {
-      if (!state.duration) return;
-      const start = Math.min(elements.videoPlayer.currentTime || 0, Math.max(0, state.duration - 0.5));
-      const end = Math.min(state.duration, start + 6);
-      state.rallies.push({ id: Date.now(), start, end, confidence: 1 });
-      renderAll();
-    }
-
-    async function exportVideo() {
-      if (!state.taskId || !state.rallies.length) return;
-      state.status = 'exporting';
-      elements.exportResult.classList.remove('visible');
-      elements.exportButtonText.textContent = '正在生成';
-      elements.exportButton.querySelector('svg')?.classList.add('spin');
-      setTaskBanner('正在剪辑、编码并合并回合', 'working');
-      renderControls();
+    // Export Request API
+    async function submitExport() {
+      if (!state.taskId || state.rallies.length === 0) return;
+      elements.exportSubmitBtn.disabled = true;
+      elements.exportSubmitText.textContent = '正在剪辑与编码中...';
+      setTaskBanner('FFmpeg 正在后台执行精准切片与压缩拼接...', 'working');
 
       const payload = {
-        rallies: normalizedRallies().map(item => ({ start: Number(item.start.toFixed(3)), end: Number(item.end.toFixed(3)) })),
+        rallies: state.rallies.map(r => ({ start: Number(r.start.toFixed(3)), end: Number(r.end.toFixed(3)) })),
         export_type: document.querySelector('input[name="exportType"]:checked').value,
         resolution: document.querySelector('input[name="resolution"]:checked').value,
         codec: document.querySelector('input[name="codec"]:checked').value,
-        crf: Number(elements.crfRange.value),
-        pre_buffer: Number(document.getElementById('preBuffer').value),
-        post_buffer: Number(document.getElementById('postBuffer').value),
+        crf: Number(elements.crfSelect.value),
+        pre_buffer: Number(elements.preBufferSelect.value),
+        post_buffer: Number(elements.postBufferSelect.value),
       };
 
       try {
@@ -1767,114 +2452,128 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+
         if (!response.ok) {
-          let detail = '导出失败';
-          try { detail = (await response.json()).detail || detail; } catch { /* no-op */ }
-          throw new Error(detail);
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.detail || `导出错误 (${response.status})`);
         }
+
+        const filename = response.headers.get('X-Export-Filename') || (payload.export_type === 'zip' ? 'badminton_rallies.zip' : 'badminton_edited.mp4');
         const blob = await response.blob();
-        if (state.exportObjectUrl) URL.revokeObjectURL(state.exportObjectUrl);
-        state.exportObjectUrl = URL.createObjectURL(blob);
-        const filename = response.headers.get('X-Export-Filename') || `badminton_highlight.${payload.export_type === 'zip' ? 'zip' : 'mp4'}`;
-        const fileSizeMb = Number(response.headers.get('X-File-Size-MB')) || blob.size / 1024 / 1024;
-        state.status = 'ready';
-        elements.exportResultMeta.textContent = `${payload.resolution.toUpperCase()} · ${payload.codec.toUpperCase()} · ${fileSizeMb.toFixed(2)} MB`;
-        elements.downloadLink.href = state.exportObjectUrl;
-        elements.downloadLink.download = filename;
-        elements.exportResult.classList.add('visible');
-        setTaskBanner('视频已生成，可以下载', 'success');
-        setTimeout(() => { if (state.status === 'ready') hideTaskBanner(); }, 2600);
-      } catch (error) {
-        state.status = 'ready';
-        setTaskBanner(error.message || '导出失败', 'error');
-        showToast(error.message || '导出失败', 'error');
+        if (state.exportBlobUrl) URL.revokeObjectURL(state.exportBlobUrl);
+        state.exportBlobUrl = URL.createObjectURL(blob);
+
+        // Direct Download Trigger
+        const tempLink = document.createElement('a');
+        tempLink.href = state.exportBlobUrl;
+        tempLink.download = filename;
+        document.body.appendChild(tempLink);
+        tempLink.click();
+        tempLink.remove();
+
+        elements.exportDownloadLink.href = state.exportBlobUrl;
+        elements.exportDownloadLink.download = filename;
+        elements.exportResultBox.style.display = 'block';
+        setTaskBanner('导出完成！文件已下载', 'success');
+        showToast('视频导出成功，已保存到本地');
+      } catch (err) {
+        showToast(err.message, true);
+        setTaskBanner(err.message, 'error');
       } finally {
-        elements.exportButtonText.textContent = '生成剪辑';
-        elements.exportButton.querySelector('svg')?.classList.remove('spin');
-        renderControls();
-        refreshIcons();
+        elements.exportSubmitBtn.disabled = false;
+        elements.exportSubmitText.textContent = '立即生成并下载剪辑';
       }
     }
 
-    elements.videoInput.addEventListener('change', event => handleFile(event.target.files[0]));
-    elements.addRallyButton.addEventListener('click', addRally);
-    elements.smartSkipButton?.addEventListener('click', toggleSmartSkip);
-    elements.loopRallyButton?.addEventListener('click', toggleLoopRally);
-    elements.setStartButton?.addEventListener('click', setSelectedStartAtPlayhead);
-    elements.setEndButton?.addEventListener('click', setSelectedEndAtPlayhead);
-    elements.mergeAdjacentButton?.addEventListener('click', mergeAdjacentRallies);
-    elements.splitRallyButton?.addEventListener('click', splitSelectedRallyAtPlayhead);
-    elements.deleteSelectedButton?.addEventListener('click', deleteSelectedRally);
-    elements.zoomInButton?.addEventListener('click', () => setTimelineZoom(state.timelineZoom * 1.35));
-    elements.zoomOutButton?.addEventListener('click', () => setTimelineZoom(state.timelineZoom / 1.35));
-    elements.zoomFitButton?.addEventListener('click', () => {
-      state.timelineZoom = 1;
-      elements.timelineViewport.scrollLeft = 0;
-      renderTimeline();
-      updateTimelineChrome();
-      renderControls();
-    });
-    elements.scrollToPlayheadButton?.addEventListener('click', () => {
-      scrollTimelineToTime(elements.videoPlayer.currentTime || 0, true);
-    });
-    elements.timelineViewport?.addEventListener('wheel', event => {
-      if (!state.duration) return;
-      // Trackpad pinch often sets ctrlKey; also support alt+wheel.
-      if (event.ctrlKey || event.metaKey || event.altKey) {
-        event.preventDefault();
-        const factor = event.deltaY > 0 ? 1 / 1.12 : 1.12;
-        setTimelineZoom(state.timelineZoom * factor, event.clientX);
-        renderControls();
-        return;
-      }
-      // Horizontal wheel / shift+wheel pans naturally via native scroll; enhance vertical as pan when zoomed.
-      if (state.timelineZoom > 1.02 && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
-        event.preventDefault();
-        elements.timelineViewport.scrollLeft += event.deltaY;
-        updateTimelineChrome();
-      }
-    }, { passive: false });
-    elements.timelineViewport?.addEventListener('scroll', () => updateTimelineChrome());
-    elements.timelineViewport?.addEventListener('pointerdown', beginTimelinePan);
-    elements.timelineViewport?.addEventListener('dblclick', event => {
-      if (event.target.closest('.segment')) return;
-      setTimelineZoom(Math.min(TIMELINE_MAX_ZOOM, state.timelineZoom * 1.8), event.clientX);
-      renderControls();
-    });
-    elements.calibrateCourtButton.addEventListener('click', openCourtCalibration);
-    elements.resetCourtButton.addEventListener('click', () => {
-      state.courtRoi = DEFAULT_COURT_ROI.map(point => ({ ...point }));
-      renderCourtOverlay();
-    });
-    elements.confirmCourtButton.addEventListener('click', async () => {
+    // Restore Task From URL: ?task=xxx&calibrate=1
+    async function restoreFromUrl() {
+      const p = new URLSearchParams(window.location.search);
+      const taskId = p.get('task')?.trim();
+      if (!taskId) return;
+
+      setTaskBanner('正在恢复任务状态...', 'working');
       try {
-        await startAnalysis();
-      } catch (error) {
-        state.status = 'error';
-        setTaskBanner(error.message || '分析任务启动失败', 'error');
-        renderControls();
-      }
-    });
-    elements.exportButton.addEventListener('click', exportVideo);
-    elements.crfRange.addEventListener('input', () => { elements.crfValue.textContent = elements.crfRange.value; });
-    ['preBuffer', 'postBuffer'].forEach(id => document.getElementById(id).addEventListener('change', renderMetrics));
-    elements.videoPlayer.addEventListener('loadedmetadata', () => {
-      if (!state.duration && Number.isFinite(elements.videoPlayer.duration)) {
-        state.duration = elements.videoPlayer.duration;
+        const res = await fetch(`${API_BASE}/api/v1/video/task/${encodeURIComponent(taskId)}`, { cache: 'no-store' });
+        const task = await res.json();
+        if (!res.ok) throw new Error(task.detail || '任务不存在');
+
+        state.taskId = task.task_id;
+        state.duration = Number(task.duration) || 0;
+        elements.videoPlayer.src = task.video_url;
+        elements.emptyStage.classList.add('hidden');
+        elements.hudVideoName.textContent = task.filename;
+
+        // Fetch AI result
+        const rRes = await fetch(`${API_BASE}/api/v1/ai/result/${encodeURIComponent(taskId)}`, { cache: 'no-store' });
+        const rData = await rRes.json();
+        if (rRes.ok && rData.status === 'completed') {
+          state.rallies = (rData.rallies || []).map((item, idx) => ({
+            id: item.id || idx + 1,
+            start: Number(item.start ?? item.start_time),
+            end: Math.min(state.duration || Infinity, Number(item.end ?? item.end_time)),
+            confidence: Number(item.confidence ?? 1),
+          })).filter(r => r.end > r.start);
+          state.selectedRallyIndex = state.rallies.length ? 0 : null;
+          setTaskBanner(`成功恢复 ${state.rallies.length} 个回合`, 'success');
+          setTimeout(hideTaskBanner, 2600);
+        } else if (rRes.ok && rData.status === 'processing') {
+          state.pollTimer = setInterval(pollAiResult, 1400);
+          setTaskBanner('AI 正在后台分析中...', 'working');
+        } else {
+          hideTaskBanner();
+        }
+
         renderAll();
+        if (p.get('calibrate') === '1') {
+          openCourtCalibration();
+        }
+      } catch (err) {
+        setTaskBanner(err.message, 'error');
       }
-      updateCourtOverlayBounds();
+    }
+
+    // Render Everything
+    function renderAll() {
+      renderTimeline();
+      renderFineTuneBar();
+      updateCourtBounds();
+      refreshIcons();
+    }
+
+    // ==========================================
+    // 8. Event Bindings & Lifecycle Listeners
+    // ==========================================
+    window.addEventListener('resize', () => {
+      renderTimeline();
+      updateCourtBounds();
     });
+
+    elements.videoInput.addEventListener('change', e => {
+      handleFileInput(e.target.files[0]);
+    });
+
+    // Player Events
+    elements.videoPlayer.addEventListener('loadedmetadata', () => {
+      state.duration = elements.videoPlayer.duration || state.duration;
+      updatePlayheadUI();
+      renderTimeline();
+      updateCourtBounds();
+    });
+
     elements.videoPlayer.addEventListener('timeupdate', () => {
-      updatePlayhead();
+      updatePlayheadUI();
       const cur = elements.videoPlayer.currentTime;
+
+      // Loop Rally Mode
       if (state.loopRally && state.selectedRallyIndex !== null && state.rallies[state.selectedRallyIndex]) {
         const rally = state.rallies[state.selectedRallyIndex];
-        if (cur >= rally.end - 0.04) {
+        if (cur >= rally.end - 0.05) {
           elements.videoPlayer.currentTime = rally.start;
           return;
         }
       }
+
+      // Smart Skip Mode (Skip between dead ball times)
       if (state.smartSkip && state.rallies.length > 0 && !elements.videoPlayer.paused) {
         const sorted = [...state.rallies].sort((a, b) => a.start - b.start);
         const inside = sorted.find(r => cur >= r.start - 0.05 && cur <= r.end - 0.04);
@@ -1884,112 +2583,160 @@
             elements.videoPlayer.currentTime = next.start;
           } else if (cur > sorted[sorted.length - 1].end) {
             elements.videoPlayer.pause();
-            elements.videoPlayer.currentTime = sorted[sorted.length - 1].end;
+            updatePlayPauseButton();
           }
         }
       }
-      if (state.rallyPlaybackEnd !== null && cur >= state.rallyPlaybackEnd - 0.03) {
-        const rallyEnd = state.rallyPlaybackEnd;
+
+      // Rally Playback Sentinel (End point pause)
+      if (state.rallyPlaybackEnd !== null && cur >= state.rallyPlaybackEnd - 0.04) {
+        const endTarget = state.rallyPlaybackEnd;
         state.rallyPlaybackEnd = null;
         elements.videoPlayer.pause();
-        elements.videoPlayer.currentTime = rallyEnd;
+        elements.videoPlayer.currentTime = endTarget;
+        updatePlayPauseButton();
       }
     });
-    elements.videoPlayer.addEventListener('ended', () => { state.rallyPlaybackEnd = null; });
-    elements.videoPlayer.addEventListener('seeked', updatePlayhead);
 
-    ['dragenter', 'dragover'].forEach(name => elements.videoStage.addEventListener(name, event => {
-      event.preventDefault();
-      elements.videoStage.classList.add('dragging');
-    }));
-    ['dragleave', 'drop'].forEach(name => elements.videoStage.addEventListener(name, event => {
-      event.preventDefault();
-      elements.videoStage.classList.remove('dragging');
-    }));
-    elements.videoStage.addEventListener('drop', event => handleFile(event.dataTransfer.files[0]));
-    document.addEventListener('pointermove', event => {
-      moveSegment(event);
-      moveTimelinePan(event);
-      moveCourtHandle(event);
+    elements.videoPlayer.addEventListener('play', () => {
+      updatePlayPauseButton();
+      resetHudTimer();
     });
-    document.addEventListener('pointerup', event => {
-      finishSegmentDrag();
-      finishTimelinePan(event);
-      state.courtDragIndex = null;
+    elements.videoPlayer.addEventListener('pause', () => {
+      updatePlayPauseButton();
+      showHud();
     });
-    document.addEventListener('keydown', event => {
-      const tag = (event.target && event.target.tagName) || '';
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
-      if (event.key === ' ' || event.code === 'Space') {
-        event.preventDefault();
-        if (elements.videoPlayer.paused) elements.videoPlayer.play();
-        else elements.videoPlayer.pause();
-      } else if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        const delta = event.shiftKey ? 1.0 : (event.altKey ? 5.0 : 0.2);
-        elements.videoPlayer.currentTime = Math.max(0, (elements.videoPlayer.currentTime || 0) - delta);
-        updatePlayhead();
-      } else if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        const delta = event.shiftKey ? 1.0 : (event.altKey ? 5.0 : 0.2);
-        elements.videoPlayer.currentTime = Math.min(state.duration || 99999, (elements.videoPlayer.currentTime || 0) + delta);
-        updatePlayhead();
-      } else if (event.key === '[' && state.selectedRallyIndex != null) {
-        event.preventDefault();
-        setSelectedStartAtPlayhead();
-      } else if (event.key === ']' && state.selectedRallyIndex != null) {
-        event.preventDefault();
-        setSelectedEndAtPlayhead();
-      } else if ((event.key === 'x' || event.key === 'X') && !event.metaKey && !event.ctrlKey) {
-        event.preventDefault();
-        toggleSmartSkip();
-      } else if ((event.key === 'l' || event.key === 'L') && !event.metaKey && !event.ctrlKey) {
-        event.preventDefault();
-        toggleLoopRally();
-      } else if ((event.key === 'm' || event.key === 'M') && !event.metaKey && !event.ctrlKey) {
-        event.preventDefault();
-        mergeAdjacentRallies();
-      } else if ((event.key === 'j' || event.key === 'J') && !event.metaKey && !event.ctrlKey) {
-        event.preventDefault();
-        elements.videoPlayer.currentTime = Math.max(0, (elements.videoPlayer.currentTime || 0) - 1.0);
-        updatePlayhead();
-      } else if ((event.key === 'k' || event.key === 'K') && !event.metaKey && !event.ctrlKey) {
-        event.preventDefault();
-        if (elements.videoPlayer.paused) elements.videoPlayer.play();
-        else elements.videoPlayer.pause();
-      } else if ((event.key === '+' || event.key === '=') && state.duration) {
-        event.preventDefault();
-        setTimelineZoom(state.timelineZoom * 1.25);
-        renderControls();
-      } else if (event.key === '-' && state.duration) {
-        event.preventDefault();
-        setTimelineZoom(state.timelineZoom / 1.25);
-        renderControls();
-      } else if (event.key === '0' && state.duration) {
-        event.preventDefault();
-        state.timelineZoom = 1;
-        elements.timelineViewport.scrollLeft = 0;
-        renderTimeline();
-        renderControls();
-      } else if ((event.key === 'Delete' || event.key === 'Backspace') && state.selectedRallyIndex != null) {
-        event.preventDefault();
+    elements.videoPlayer.addEventListener('ended', () => {
+      state.rallyPlaybackEnd = null;
+      updatePlayPauseButton();
+    });
+
+    // Gesture Tap Listeners
+    elements.gestureLeft.addEventListener('click', () => handleTapZone('left'));
+    elements.gestureRight.addEventListener('click', () => handleTapZone('right'));
+
+    // Controls Row Listeners
+    elements.hudPlayBtn.addEventListener('click', togglePlay);
+    elements.stepPrevBtn.addEventListener('click', () => stepFrame(-1));
+    elements.stepNextBtn.addEventListener('click', () => stepFrame(1));
+
+    // Speed Selector
+    elements.speedToggleBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      elements.speedMenu.classList.toggle('open');
+    });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.speed-picker')) elements.speedMenu.classList.remove('open');
+    });
+    elements.speedMenu.querySelectorAll('.speed-opt').forEach(opt => {
+      opt.addEventListener('click', () => {
+        const spd = Number(opt.dataset.speed);
+        state.playbackRate = spd;
+        elements.videoPlayer.playbackRate = spd;
+        elements.speedToggleBtn.textContent = `${spd}x`;
+        elements.speedMenu.querySelectorAll('.speed-opt').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        elements.speedMenu.classList.remove('open');
+        showToast(`播放倍速: ${spd}x`);
+      });
+    });
+
+    // Fullscreen Toggle
+    elements.fullscreenBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        elements.videoStage.requestFullscreen?.() || elements.videoPlayer.webkitEnterFullscreen?.();
+      } else {
+        document.exitFullscreen?.();
+      }
+    });
+
+    // Top HUD Chips
+    elements.chipCalibrate.addEventListener('click', openCourtCalibration);
+    elements.chipSmartSkip.addEventListener('click', () => {
+      state.smartSkip = !state.smartSkip;
+      elements.chipSmartSkip.classList.toggle('active', state.smartSkip);
+      showToast(state.smartSkip ? '已开启跳过死球模式 (连续看精彩打点)' : '已关闭跳过死球');
+    });
+    elements.chipLoop.addEventListener('click', () => {
+      if (state.selectedRallyIndex === null) {
+        showToast('请先选择一个回合', true);
+        return;
+      }
+      state.loopRally = !state.loopRally;
+      elements.chipLoop.classList.toggle('active', state.loopRally);
+      showToast(state.loopRally ? '已开启单回合循环播放' : '已关闭循环');
+    });
+
+    // Court Tools
+    elements.courtResetBtn.addEventListener('click', () => {
+      state.courtRoi = DEFAULT_COURT_ROI.map(p => ({ ...p }));
+      renderCourtOverlay();
+    });
+    elements.courtConfirmBtn.addEventListener('click', triggerAiAnalysis);
+
+    // Zoom Buttons
+    elements.zoomInBtn.addEventListener('click', () => setZoom(state.timelineZoom * 1.5));
+    elements.zoomOutBtn.addEventListener('click', () => setZoom(state.timelineZoom / 1.5));
+    elements.zoomFitBtn.addEventListener('click', () => setZoom(1.0));
+    elements.seekPlayheadBtn.addEventListener('click', () => {
+      scrollToTime(elements.videoPlayer.currentTime, true);
+    });
+
+    // Fine-Tuning Actions (Dynamic Non-Restart Extension)
+    elements.tuneStartMinus.addEventListener('click', () => adjustSelectedRallyStart(-0.5));
+    elements.tuneStartPlus.addEventListener('click', () => adjustSelectedRallyStart(0.5));
+    elements.tuneEndMinus.addEventListener('click', () => adjustSelectedRallyEnd(-0.5));
+    elements.tuneEndPlus.addEventListener('click', () => adjustSelectedRallyEnd(0.5));
+    elements.playRallyPill.addEventListener('click', () => {
+      if (state.selectedRallyIndex !== null) {
+        playSelectedRally();
+      } else {
+        togglePlay();
+      }
+    });
+
+    // Main Keys
+    elements.btnAddRally.addEventListener('click', addRallyAtPlayhead);
+    elements.btnSplitRally.addEventListener('click', splitSelectedRally);
+    elements.btnMergeRallies.addEventListener('click', mergeAdjacentRallies);
+    elements.btnDeleteRally.addEventListener('click', deleteSelectedRally);
+    elements.btnOpenRalliesSheet.addEventListener('click', openRallySheet);
+    elements.btnOpenExportSheet.addEventListener('click', openExportSheet);
+
+    // Sheet Closers
+    elements.closeRallySheetBtn.addEventListener('click', closeRallySheet);
+    elements.rallySheetBackdrop.addEventListener('click', closeRallySheet);
+    elements.closeExportSheetBtn.addEventListener('click', closeExportSheet);
+    elements.exportSheetBackdrop.addEventListener('click', closeExportSheet);
+
+    // Export Submit
+    elements.exportSubmitBtn.addEventListener('click', submitExport);
+
+    // Keyboard Shortcuts (Desktop Accessibility)
+    window.addEventListener('keydown', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        togglePlay();
+      } else if (e.code === 'ArrowLeft') {
+        seekRelative(-1.0);
+      } else if (e.code === 'ArrowRight') {
+        seekRelative(1.0);
+      } else if (e.code === 'Delete' || e.code === 'Backspace') {
         deleteSelectedRally();
-      } else if (event.key === 's' && (event.metaKey || event.ctrlKey) === false && state.selectedRallyIndex != null) {
-        // plain S splits at playhead
-        event.preventDefault();
-        splitSelectedRallyAtPlayhead();
+      } else if (e.key === 's' || e.key === 'S') {
+        splitSelectedRally();
+      } else if (e.key === '[') {
+        adjustSelectedRallyStart(-0.5);
+      } else if (e.key === ']') {
+        adjustSelectedRallyEnd(0.5);
       }
     });
-    window.addEventListener('resize', () => {
-      updateCourtOverlayBounds();
-      updateTimelineChrome();
-      renderTimeline();
-    });
 
-    refreshIcons();
-    checkApi();
+    // Startup
+    checkApiHealth();
+    restoreFromUrl();
     renderAll();
-    restoreTaskFromUrl();
   </script>
 </body>
 </html>

@@ -3,6 +3,7 @@ package icu.yuqiuyijiaren.xiaobai.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,10 +13,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -26,131 +31,143 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import icu.yuqiuyijiaren.xiaobai.domain.AnalysisTier
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Amber
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Blue
+import icu.yuqiuyijiaren.xiaobai.ui.theme.Green
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Ink
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Muted
+import icu.yuqiuyijiaren.xiaobai.ui.theme.StudioElevated
+import icu.yuqiuyijiaren.xiaobai.ui.theme.SurfaceGlass
 
-/**
- * Compact header: device line + recognition intensity.
- * Only change from prior version: status-bar top inset so content is not under the notch.
- */
 @Composable
 fun EditorTopBar(
-    deviceSummary: String,
-    capabilityLine: String,
-    selectedTier: AnalysisTier,
-    recommendedTier: AnalysisTier,
-    configSummary: String,
+    tier: AnalysisTier,
     canUndo: Boolean,
     roiActive: Boolean,
     roiEnabled: Boolean,
-    analyzing: Boolean,
-    onSelectTier: (AnalysisTier) -> Unit,
     onUndo: () -> Unit,
     onToggleRoi: () -> Unit,
+    onPickFile: () -> Unit,
+    onOpenTierSelector: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    Column(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color(0xCCF2F2F7))
+            .background(SurfaceGlass)
             .windowInsetsPadding(WindowInsets.statusBars)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .height(52.dp)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
     ) {
+        // Brand Left
         Row(
-            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.clickable(onClick = onOpenTierSelector),
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Blue),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.ContentCut,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            Column {
                 Text(
-                    text = deviceSummary.ifBlank { "设备探测中…" },
+                    text = "小白自动剪辑",
                     color = Ink,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold,
                 )
-                Text(
-                    text = capabilityLine.ifBlank { configSummary },
-                    color = Muted,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            IconButton(onClick = onUndo, enabled = canUndo, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    Icons.Default.Undo,
-                    contentDescription = "撤销",
-                    tint = if (canUndo) Blue else Muted,
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-            IconButton(onClick = onToggleRoi, enabled = roiEnabled, modifier = Modifier.size(36.dp)) {
-                Icon(
-                    Icons.Default.CropFree,
-                    contentDescription = "球场标定",
-                    tint = when {
-                        !roiEnabled -> Muted
-                        roiActive -> Amber
-                        else -> Blue
-                    },
-                    modifier = Modifier.size(20.dp),
-                )
-            }
-        }
-
-        Spacer(Modifier.height(6.dp))
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0x14767680))
-                .padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            AnalysisTier.entries.forEach { tier ->
-                val selected = tier == selectedTier
-                val isRecommended = tier == recommendedTier
-                val label = buildString {
-                    append(tier.label)
-                    if (isRecommended) append("·荐")
-                }
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(if (selected) Blue else Color.Transparent)
-                        .clickable(enabled = !analyzing) { onSelectTier(tier) }
-                        .padding(vertical = 7.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(Green),
+                    )
+                    Spacer(Modifier.width(4.dp))
                     Text(
-                        text = label,
-                        color = if (selected) Color.White else Ink,
-                        fontSize = 13.sp,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                        text = "${tier.label}档",
+                        color = Muted,
+                        fontSize = 10.sp,
                     )
                 }
             }
         }
-        Spacer(Modifier.height(2.dp))
-        Text(
-            text = if (analyzing) {
-                "分析中不可切换强度"
-            } else {
-                configSummary
-            },
-            color = Muted,
-            fontSize = 10.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+
+        // Actions Right
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (canUndo) {
+                IconButton(
+                    onClick = onUndo,
+                    modifier = Modifier.size(30.dp),
+                ) {
+                    Icon(
+                        Icons.Default.Undo,
+                        contentDescription = "撤销",
+                        tint = Ink,
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
+            }
+
+            if (roiEnabled) {
+                Box(
+                    modifier = Modifier
+                        .height(30.dp)
+                        .clip(RoundedCornerShape(15.dp))
+                        .background(if (roiActive) Amber.copy(alpha = 0.25f) else StudioElevated)
+                        .clickable(onClick = onToggleRoi)
+                        .padding(horizontal = 10.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = if (roiActive) "标定中" else "标定ROI",
+                        color = if (roiActive) Amber else Ink,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .height(30.dp)
+                    .clip(RoundedCornerShape(15.dp))
+                    .background(Blue)
+                    .clickable(onClick = onPickFile)
+                    .padding(horizontal = 12.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.FolderOpen,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Spacer(Modifier.width(4.dp))
+                    Text(
+                        text = "选片",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            }
+        }
     }
 }

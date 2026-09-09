@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.sp
 import icu.yuqiuyijiaren.xiaobai.domain.Rally
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Amber
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Blue
+import icu.yuqiuyijiaren.xiaobai.ui.theme.Green
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Ink
 import icu.yuqiuyijiaren.xiaobai.ui.theme.Muted
 import kotlin.math.abs
@@ -65,7 +66,8 @@ fun ZoomableRallyTimeline(
                 .fillMaxWidth()
                 .height(trackHeight)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Color(0x14767680)),
+                .background(Color(0xFF15151B))
+                .border(1.dp, Color(0xFF22222A), RoundedCornerShape(12.dp)),
             contentAlignment = Alignment.Center,
         ) {
             Text("选择视频后显示时间轴", color = Muted, fontSize = 12.sp)
@@ -83,8 +85,8 @@ fun ZoomableRallyTimeline(
             .fillMaxWidth()
             .height(trackHeight)
             .clip(RoundedCornerShape(12.dp))
-            .background(Color(0x0F767680))
-            .border(1.dp, Color(0x28767680), RoundedCornerShape(12.dp))
+            .background(Color(0xFF15151B))
+            .border(1.dp, Color(0xFF22222A), RoundedCornerShape(12.dp))
             .pointerInput(durationSec) {
                 detectTransformGestures { _, _, zoomChange, _ ->
                     zoom = (zoom * zoomChange).coerceIn(1f, 32f)
@@ -222,7 +224,7 @@ fun ZoomableRallyTimeline(
                     .fillMaxWidth()
                     .height(if (compact) 52.dp else 68.dp)
                     .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0x1A767680)),
+                    .background(Color(0xFF1C1C24)),
             )
 
             // Range mark preview
@@ -272,7 +274,7 @@ fun ZoomableRallyTimeline(
                 val rawWidth = (endRatio - startRatio).coerceAtLeast(0f)
                 val minRatio = (minBlockPx / canvasWidthPx).coerceIn(0.01f, 0.08f)
                 val widthRatio = rawWidth.coerceAtLeast(minRatio)
-                val color = if (rally.confidence < 0.72) Amber else Blue
+                val color = if (rally.confidence < 0.72) Amber else Green
                 val selected = selectedIndex == index
                 Box(
                     modifier = Modifier
@@ -281,11 +283,12 @@ fun ZoomableRallyTimeline(
                         .offset(x = canvasWidth * startRatio)
                         .width(canvasWidth * widthRatio)
                         .height(if (compact) 36.dp else 48.dp)
-                        .clip(RoundedCornerShape(10.dp))
-                        .background(color.copy(alpha = if (selected) 1f else 0.82f))
-                        .then(
-                            if (selected) Modifier.border(2.dp, Ink, RoundedCornerShape(10.dp))
-                            else Modifier,
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(color.copy(alpha = if (selected) 0.95f else 0.45f))
+                        .border(
+                            width = if (selected) 2.dp else 1.dp,
+                            color = if (selected) Color.White else color,
+                            shape = RoundedCornerShape(8.dp),
                         )
                         .pointerInput(index) {
                             detectTapGestures {
@@ -295,10 +298,10 @@ fun ZoomableRallyTimeline(
                         },
                 ) {
                     Text(
-                        text = "%02d".format(index + 1),
+                        text = "#%02d".format(index + 1),
                         color = Color.White,
-                        fontSize = 12.sp,
-                        style = MaterialTheme.typography.labelMedium,
+                        fontSize = 11.sp,
+                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                         modifier = Modifier.align(Alignment.Center),
                     )
                     if (selected) {
@@ -316,10 +319,10 @@ fun ZoomableRallyTimeline(
                     .offset(x = canvasWidth * playRatio - 1.5.dp)
                     .width(3.dp)
                     .height(if (compact) 56.dp else 72.dp)
-                    .background(Ink),
+                    .background(Color(0xFFFF453A)),
             )
 
-            val ticks = adaptiveTicks(durationSec, zoom)
+            val ticks = adaptiveTicks(durationSec, canvasWidth.value)
             ticks.forEach { t ->
                 Text(
                     text = formatClock(t),
@@ -341,18 +344,11 @@ private fun androidx.compose.foundation.layout.BoxScope.HandleBar(align: Alignme
         modifier = Modifier
             .align(align)
             .fillMaxHeight()
-            .width(14.dp)
-            .background(Color.White.copy(alpha = 0.92f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Box(
-            modifier = Modifier
-                .width(3.dp)
-                .height(22.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Ink.copy(alpha = 0.75f)),
-        )
-    }
+            .width(12.dp)
+            .padding(vertical = 4.dp, horizontal = 2.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(Color.White),
+    )
 }
 
 private sealed interface DragMode {
@@ -367,23 +363,20 @@ private sealed interface DragMode {
     ) : DragMode
 }
 
-private fun adaptiveTicks(durationSec: Double, zoom: Float): List<Double> {
-    val visible = durationSec / zoom.coerceAtLeast(1f)
-    val step = when {
-        visible <= 15 -> 1.0
-        visible <= 30 -> 2.0
-        visible <= 90 -> 5.0
-        visible <= 180 -> 15.0
-        visible <= 600 -> 30.0
-        else -> 60.0
-    }
+private fun adaptiveTicks(durationSec: Double, canvasWidthDp: Float): List<Double> {
+    if (durationSec <= 0.0 || canvasWidthDp <= 0f) return emptyList()
+    val minIntervalDp = 56f
+    val maxLabels = (canvasWidthDp / minIntervalDp).toInt().coerceIn(2, 60)
+    val rawStep = durationSec / maxLabels
+    val candidates = doubleArrayOf(1.0, 2.0, 5.0, 10.0, 15.0, 30.0, 60.0, 120.0, 300.0, 600.0)
+    val step = candidates.firstOrNull { it >= rawStep } ?: 600.0
     val ticks = ArrayList<Double>()
     var t = 0.0
-    while (t <= durationSec + 1e-6) {
+    while (t <= durationSec - step * 0.3) {
         ticks.add(t)
         t += step
     }
-    if (ticks.lastOrNull() != durationSec) ticks.add(durationSec)
+    ticks.add(durationSec)
     return ticks
 }
 

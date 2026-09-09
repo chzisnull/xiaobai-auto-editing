@@ -47,9 +47,7 @@ class LocalExporter(
         var muxer: MediaMuxer? = null
         try {
             val uri = Uri.parse(source.uriString)
-            context.contentResolver.openFileDescriptor(uri, "r")?.use { pfd ->
-                extractor.setDataSource(pfd.fileDescriptor)
-            } ?: extractor.setDataSource(context, uri, null)
+            icu.yuqiuyijiaren.xiaobai.domain.MediaSourceHelper.setExtractorDataSource(extractor, context, uri)
 
             muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
             val trackMap = LinkedHashMap<Int, Int>()
