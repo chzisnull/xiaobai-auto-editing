@@ -552,6 +552,193 @@
       100% { left: 100%; }
     }
 
+    /* Call to Action Banner (Direct Edit vs AI Analysis) */
+    .cta-banner {
+      background: linear-gradient(90deg, rgba(10, 132, 255, 0.12), rgba(48, 209, 88, 0.12));
+      border-bottom: 1px solid var(--border);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+    .cta-prompt {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    .cta-badge {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-muted);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    .cta-title {
+      color: #fff;
+      font-weight: 500;
+    }
+    .cta-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cta-btn {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .cta-btn.direct-btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      border: 1px solid var(--border);
+    }
+    .cta-btn.direct-btn:hover { background: rgba(255, 255, 255, 0.15); }
+    .cta-btn.ai-btn {
+      background: var(--primary-gradient);
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(10, 132, 255, 0.35);
+    }
+    .cta-btn.ai-btn:hover { filter: brightness(1.1); }
+
+    /* Top Metrics Bar */
+    .metrics-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      z-index: 10;
+      font-size: 12px;
+    }
+    .metrics-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .metric-chip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 3px 8px;
+    }
+    .metric-chip-label {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    .metric-chip-val {
+      color: #fff;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+    .metric-chip-val.highlight { color: var(--primary); }
+    .metric-ai-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(10, 132, 255, 0.15);
+      border: 1px solid rgba(10, 132, 255, 0.35);
+      color: var(--primary);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .metric-ai-btn:hover { background: rgba(10, 132, 255, 0.25); }
+
+    /* In-Player Active Marking Floating HUD */
+    .marking-hud {
+      position: absolute;
+      bottom: 48px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 15, 22, 0.9);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(48, 209, 88, 0.45);
+      border-radius: 12px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(48, 209, 88, 0.2);
+      z-index: 30;
+      animation: popIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popIn {
+      0% { opacity: 0; transform: translateX(-50%) scale(0.92); }
+      100% { opacity: 1; transform: translateX(-50%) scale(1); }
+    }
+    .marking-hud-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .marking-hud-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green);
+      animation: pulseDot 1.4s infinite;
+    }
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
+    }
+    .marking-hud-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .marking-hud-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .marking-hud-btn {
+      height: 28px;
+      padding: 0 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .marking-hud-btn.cancel {
+      color: var(--accent-red);
+      background: rgba(255, 69, 58, 0.12);
+    }
+    .marking-hud-btn.cancel:hover { background: rgba(255, 69, 58, 0.24); }
+    .marking-hud-btn.step {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .marking-hud-btn.step:hover { background: rgba(255, 255, 255, 0.2); }
+    .marking-hud-btn.commit {
+      color: #fff;
+      background: var(--accent-green);
+      box-shadow: 0 2px 8px rgba(48, 209, 88, 0.4);
+    }
+    .marking-hud-btn.commit:hover { filter: brightness(1.1); }
+
     /* Section: Tactile Mobile Timeline */
     .timeline-container {
       flex: 1;
@@ -765,6 +952,179 @@
       clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
     }
 
+    /* Range Mark Preview Layer on Timeline */
+    .range-mark-needle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--accent-green);
+      z-index: 21;
+      pointer-events: none;
+      box-shadow: 0 0 8px var(--accent-green);
+    }
+    .range-mark-fill {
+      position: absolute;
+      top: 4px;
+      bottom: 4px;
+      background: rgba(48, 209, 88, 0.22);
+      border: 1px dashed var(--accent-green);
+      border-radius: 6px;
+      pointer-events: none;
+      z-index: 12;
+    }
+
+    /* Timeline Gap Interval Card */
+    .timeline-gap {
+      position: absolute;
+      top: 10px;
+      bottom: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.45);
+      font-size: 10px;
+      overflow: hidden;
+      white-space: nowrap;
+      transition: all 0.12s ease;
+      z-index: 5;
+    }
+    .timeline-gap:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.25);
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    /* Floating Zoom Controller */
+    .floating-zoom {
+      position: absolute;
+      right: 8px;
+      bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(20, 20, 28, 0.88);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 6px;
+      padding: 2px 4px;
+      z-index: 25;
+    }
+    .floating-zoom-btn {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      font-size: 13px;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .floating-zoom-btn:hover { background: rgba(255, 255, 255, 0.2); }
+    .floating-zoom-text {
+      font-size: 10px;
+      color: var(--text-muted);
+      padding: 0 4px;
+      min-width: 32px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Rally Quick Switcher Strip */
+    .rally-quick-strip {
+      height: 38px;
+      background: var(--surface);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .strip-arrow-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-muted);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.12s ease;
+    }
+    .strip-arrow-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+    .strip-arrow-btn:disabled {
+      opacity: 0.25;
+      pointer-events: none;
+    }
+    .strip-arrow-btn svg { width: 14px; height: 14px; }
+    .strip-scroll-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scrollbar-width: none;
+      padding: 2px 0;
+    }
+    .strip-scroll-area::-webkit-scrollbar { display: none; }
+    .strip-pill {
+      height: 26px;
+      padding: 0 8px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      color: rgba(255, 255, 255, 0.75);
+      font-size: 11px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all 0.12s ease;
+    }
+    .strip-pill:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+    }
+    .strip-pill.selected {
+      background: rgba(10, 132, 255, 0.25);
+      border-color: var(--primary);
+      color: #fff;
+      font-weight: 600;
+    }
+    .strip-pill-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent-green);
+    }
+    .strip-pill.low-conf .strip-pill-dot {
+      background: var(--accent-amber);
+    }
+    .strip-gap-tag {
+      font-size: 9px;
+      color: var(--text-muted);
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+      padding: 1px 4px;
+      flex-shrink: 0;
+    }
+
     /* Section: Sticky Thumb Action Zone (Fixed Bottom) */
     .thumb-zone {
       flex: 0 0 auto;
@@ -778,16 +1138,41 @@
       box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.4);
     }
 
-    /* Fine-Tuning Bar (Dynamic extension without restart) */
+    /* Fine-Tuning Bar */
     .fine-tune-bar {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
+      flex-direction: column;
       gap: 6px;
       background: rgba(0, 0, 0, 0.25);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 4px 6px;
+      padding: 6px 10px;
+    }
+
+    .rally-header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .rally-header-title {
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .rally-header-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tune-controls-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
     }
 
     .tune-group {
@@ -843,10 +1228,66 @@
     .play-rally-pill:active { transform: scale(0.95); }
     .play-rally-pill svg { width: 14px; height: 14px; }
 
-    /* Primary Key Buttons Grid */
+    .quick-set-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      padding-top: 5px;
+    }
+
+    .quick-set-btn {
+      flex: 1;
+      height: 26px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-subtle);
+      font-size: 11px;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .quick-set-btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+    .quick-set-btn:disabled {
+      opacity: 0.3;
+      pointer-events: none;
+    }
+
+    .empty-rally-tip-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 4px 0;
+    }
+
+    .import-full-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--border-subtle);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.12s ease;
+    }
+    .import-full-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    /* Primary Key Buttons Grid (7-Column Layout) */
     .main-keys-bar {
       display: grid;
-      grid-template-columns: 1.1fr 1fr 1fr 1fr 1.1fr 1.2fr;
+      grid-template-columns: repeat(7, 1fr);
       gap: 6px;
     }
 
@@ -870,11 +1311,15 @@
     .key-btn:disabled { opacity: 0.35; pointer-events: none; }
     .key-btn svg { width: 16px; height: 16px; }
 
-    .key-btn.add-rally-btn {
-      background: var(--accent-green-glass);
-      border-color: rgba(48, 209, 88, 0.4);
+    .key-btn.active-mark {
+      background: rgba(48, 209, 88, 0.2);
+      border-color: rgba(48, 209, 88, 0.6);
       color: var(--accent-green);
     }
+    .key-btn.active-mark svg {
+      animation: pulseDot 1.4s infinite;
+    }
+
     .key-btn.delete-rally-btn {
       color: var(--accent-red);
     }
@@ -1160,18 +1605,33 @@
     .spin { animation: spin 1s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* Desktop View Adaptive Refinement */
+    /* Desktop View Adaptive Refinement (macOS & Windows) */
     @media (min-width: 900px) {
       body {
         background: #060608;
       }
       .app-root {
+        max-width: 1440px;
         border-left: 1px solid var(--border);
         border-right: 1px solid var(--border);
         box-shadow: 0 0 60px rgba(0,0,0,0.75);
       }
       .video-stage {
-        max-height: 52vh;
+        max-height: 54vh;
+      }
+      .key-btn {
+        height: 48px;
+        font-size: 12px;
+      }
+      .key-btn svg { width: 17px; height: 17px; }
+      .tune-btn {
+        height: 34px;
+        font-size: 12px;
+        padding: 0 12px;
+      }
+      .quick-set-btn {
+        height: 28px;
+        font-size: 12px;
       }
     }
   </style>
@@ -1268,6 +1728,19 @@
           <button class="court-bar-btn primary" id="courtConfirmBtn">开始AI分析</button>
         </div>
 
+        <!-- Floating Active Marking HUD Overlay -->
+        <div class="marking-hud" id="markingHud" style="display: none;">
+          <div class="marking-hud-info">
+            <span class="marking-hud-dot"></span>
+            <span class="marking-hud-title" id="markingHudTitle">正在标记回合: 起点 00:00 · 长度 0.0s</span>
+          </div>
+          <div class="marking-hud-actions">
+            <button class="marking-hud-btn cancel" id="btnCancelMarkHud" title="取消当前标记 (快捷键: Esc)">取消标记</button>
+            <button class="marking-hud-btn step" id="btnFfMarkHud" title="快进 1.5 秒 (快捷键: F)">+1.5s</button>
+            <button class="marking-hud-btn commit" id="btnCommitMarkHud" title="以此点作为终点完成标记 (快捷键: O)">标结束 ✓</button>
+          </div>
+        </div>
+
         <!-- Empty State Screen -->
         <div class="empty-stage" id="emptyStage">
           <div class="empty-icon-wrap"><i data-lucide="video"></i></div>
@@ -1287,6 +1760,52 @@
         </div>
         <div class="task-progress-mini" id="taskProgressMini">
           <div class="task-progress-fill" id="taskProgressFill"></div>
+        </div>
+      </div>
+
+      <!-- Dual-Entry Call to Action Banner (Direct Edit vs AI Analysis) -->
+      <div class="cta-banner" id="ctaBanner" style="display: none;">
+        <div class="cta-prompt">
+          <span class="cta-badge">已载入视频</span>
+          <span class="cta-title">请选择剪辑模式：直接纯手动打点，或启动 AI 视觉检测</span>
+        </div>
+        <div class="cta-actions">
+          <button class="cta-btn direct-btn" id="btnDirectEdit" title="跳过 AI 分析，纯手动标记打点剪辑">
+            <i data-lucide="play"></i>
+            <span>免识别直接剪辑</span>
+          </button>
+          <button class="cta-btn ai-btn" id="btnAiAnalyzeCta" title="启动 AI 视觉分析，自动检测发球和回合">
+            <i data-lucide="sparkles"></i>
+            <span>智能识别</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Top Metrics Bar (Orig, Cut, Reduction, Rallies, +AI button) -->
+      <div class="metrics-bar" id="metricsBar" style="display: none;">
+        <div class="metrics-left">
+          <div class="metric-chip">
+            <span class="metric-chip-label">原片</span>
+            <span class="metric-chip-val" id="metricOrigDur">00:00</span>
+          </div>
+          <div class="metric-chip">
+            <span class="metric-chip-label">成片</span>
+            <span class="metric-chip-val highlight" id="metricCutDur">00:00</span>
+          </div>
+          <div class="metric-chip">
+            <span class="metric-chip-label">精简</span>
+            <span class="metric-chip-val" id="metricReduction">0%</span>
+          </div>
+          <div class="metric-chip">
+            <span class="metric-chip-label">回合</span>
+            <span class="metric-chip-val" id="metricRallyCount">0段</span>
+          </div>
+        </div>
+        <div class="metrics-right">
+          <button class="metric-ai-btn" id="btnTriggerAiTop" title="开始或重新运行 AI 视觉检测">
+            <i data-lucide="sparkles"></i>
+            <span id="metricAiBtnText">AI 识别</span>
+          </button>
         </div>
       </div>
 
@@ -1317,53 +1836,117 @@
             <div class="playhead-needle" id="playheadNeedle"></div>
           </div>
         </div>
+
+        <!-- Floating Zoom Controller (Pinned Bottom Right) -->
+        <div class="floating-zoom" id="floatingZoom">
+          <button class="floating-zoom-btn" id="floatZoomOut" title="缩小时间轴 (快捷键: -)">-</button>
+          <span class="floating-zoom-text" id="floatZoomText">1.0x</span>
+          <button class="floating-zoom-btn" id="floatZoomIn" title="放大时间轴 (快捷键: =)">+</button>
+        </div>
       </section>
+
+      <!-- Rally Quick Switcher Strip (Horizontal Pill Carousel + Gap Tags) -->
+      <div class="rally-quick-strip" id="rallyQuickStrip">
+        <button class="strip-arrow-btn" id="btnQuickPrev" title="上一回合 (快捷键: [)">
+          <i data-lucide="chevron-left"></i>
+        </button>
+        <div class="strip-scroll-area" id="stripScrollArea">
+          <div style="font-size: 11px; color: var(--text-muted); padding-left: 4px;">暂无回合，使用下方按钮标记或导入整片</div>
+        </div>
+        <button class="strip-arrow-btn" id="btnQuickNext" title="下一回合 (快捷键: ])">
+          <i data-lucide="chevron-right"></i>
+        </button>
+      </div>
     </div>
 
     <!-- Sticky Bottom Thumb Action Zone -->
     <footer class="thumb-zone">
-      <!-- Fine-Tuning Bar: Dynamic Duration Extension WITHOUT RESTART -->
-      <div class="fine-tune-bar">
-        <div class="tune-group">
-          <span class="tune-tag">起点</span>
-          <button class="tune-btn" id="tuneStartMinus" title="起点 -0.5s">-0.5s</button>
-          <button class="tune-btn" id="tuneStartPlus" title="起点 +0.5s">+0.5s</button>
+      <!-- Fine-Tuning Bar -->
+      <div class="fine-tune-bar" id="fineTuneBar">
+        <!-- Direct Edit & Empty State Row -->
+        <div class="empty-rally-tip-row" id="emptyRallyTipRow">
+          <span>💡 播放视频到精彩处，点击底部 [标开始] 和 [标结束] 即可标记回合</span>
+          <button class="import-full-btn" id="btnImportFullRally" title="将整段视频作为一个完整回合导入直接剪辑">
+            <i data-lucide="scissors"></i>
+            <span>导入整片</span>
+          </button>
         </div>
 
-        <button class="play-rally-pill" id="playRallyPill">
-          <i data-lucide="play" id="playRallyPillIcon"></i>
-          <span id="playRallyPillText">播放本段</span>
-        </button>
+        <!-- Selected Rally Header Info Row -->
+        <div class="rally-header-row" id="rallyHeaderRow" style="display: none;">
+          <span class="rally-header-title" id="rallyHeaderTitle">第 01 / 01 回合</span>
+          <div class="rally-header-meta">
+            <span id="rallyNeighborGapText" style="color: #a2a2ab;"></span>
+            <span id="rallyConfText">置信度 100%</span>
+          </div>
+        </div>
 
-        <div class="tune-group">
-          <span class="tune-tag">终点</span>
-          <button class="tune-btn" id="tuneEndMinus" title="终点 -0.5s">-0.5s</button>
-          <button class="tune-btn extend-btn" id="tuneEndPlus" title="终点 +0.5s (边播边顺延)">+0.5s</button>
+        <!-- Dynamic Duration Extension & Playback Row -->
+        <div class="tune-controls-row" id="tuneControlsRow" style="display: none;">
+          <div class="tune-group">
+            <span class="tune-tag">起点</span>
+            <button class="tune-btn" id="tuneStartMinus" title="起点 -0.5s (调整并重新试听)">-0.5s</button>
+            <button class="tune-btn" id="tuneStartPlus" title="起点 +0.5s">+0.5s</button>
+          </div>
+
+          <button class="play-rally-pill" id="playRallyPill">
+            <i data-lucide="play" id="playRallyPillIcon"></i>
+            <span id="playRallyPillText">播放本段</span>
+          </button>
+
+          <div class="tune-group">
+            <span class="tune-tag">终点</span>
+            <button class="tune-btn" id="tuneEndMinus" title="终点 -0.5s">-0.5s</button>
+            <button class="tune-btn extend-btn" id="tuneEndPlus" title="终点 +0.5s (边播边顺延，不打断播放)">+0.5s</button>
+          </div>
+        </div>
+
+        <!-- Quick Set Row: 以播头设为起点 / 终点 -->
+        <div class="quick-set-row" id="quickSetRow" style="display: none;">
+          <button class="quick-set-btn" id="btnSetStartAtPlayhead" title="将当前播放头位置设为本回合起点">以播头设为起点</button>
+          <button class="quick-set-btn" id="btnSetEndAtPlayhead" title="将当前播放头位置设为本回合终点">以播头设为终点</button>
         </div>
       </div>
 
-      <!-- Main Action Key Bar -->
+      <!-- Main Action Key Bar (7 Permanent Buttons) -->
       <div class="main-keys-bar">
-        <button class="key-btn add-rally-btn" id="btnAddRally" title="在当前播放位置添加新回合">
-          <i data-lucide="plus"></i>
-          <span>+回合</span>
+        <!-- 1. 标开始 (常驻按钮) -->
+        <button class="key-btn" id="btnMarkStart" title="以当前播放位置作为回合起点 (快捷键: I)">
+          <i data-lucide="flag"></i>
+          <span id="btnMarkStartText">标开始</span>
         </button>
-        <button class="key-btn" id="btnSplitRally" title="在播放头处拆分选中回合" disabled>
+
+        <!-- 2. 快进 1.5s (常驻按钮) -->
+        <button class="key-btn" id="btnFastForward" title="快进 1.5 秒 (快捷键: F)">
+          <i data-lucide="fast-forward"></i>
+          <span>+1.5s</span>
+        </button>
+
+        <!-- 3. 标结束 (常驻按钮) -->
+        <button class="key-btn" id="btnMarkEnd" title="以当前播放位置作为回合终点 (快捷键: O)">
+          <i data-lucide="check-circle-2"></i>
+          <span>标结束</span>
+        </button>
+
+        <!-- 4. 拆分 -->
+        <button class="key-btn" id="btnSplitRally" title="在当前播放头处拆分选中回合 (快捷键: S)" disabled>
           <i data-lucide="scissors"></i>
           <span>拆分</span>
         </button>
-        <button class="key-btn" id="btnMergeRallies" title="合并相邻碎片回合 (<1.0s)" disabled>
-          <i data-lucide="git-merge"></i>
-          <span>合并</span>
-        </button>
-        <button class="key-btn delete-rally-btn" id="btnDeleteRally" title="删除当前选定回合" disabled>
+
+        <!-- 5. 删除 -->
+        <button class="key-btn delete-rally-btn" id="btnDeleteRally" title="删除选中回合 (快捷键: Delete)" disabled>
           <i data-lucide="trash-2"></i>
           <span>删除</span>
         </button>
+
+        <!-- 6. 回合表 -->
         <button class="key-btn" id="btnOpenRalliesSheet" title="查看全部回合列表">
           <i data-lucide="list"></i>
           <span id="rallyCountText">回合 (0)</span>
         </button>
+
+        <!-- 7. 导出 -->
         <button class="key-btn export-btn" id="btnOpenExportSheet" title="导出剪辑视频" disabled>
           <i data-lucide="download"></i>
           <span>导出</span>
@@ -1516,6 +2099,8 @@
       isDraggingRallyHandle: null, // { type: 'start'|'end', index: number, startX: number, initVal: number }
       isScrubbingMini: false,
       exportBlobUrl: null,
+      rangeMarkIn: null,       // Marker start timestamp in seconds (Double or null)
+      isDirectEditing: false,  // Direct editing without AI mode flag
     };
 
     // DOM References
@@ -1554,12 +2139,27 @@
       courtToolsBar: document.getElementById('courtToolsBar'),
       courtResetBtn: document.getElementById('courtResetBtn'),
       courtConfirmBtn: document.getElementById('courtConfirmBtn'),
+      markingHud: document.getElementById('markingHud'),
+      markingHudTitle: document.getElementById('markingHudTitle'),
+      btnCancelMarkHud: document.getElementById('btnCancelMarkHud'),
+      btnFfMarkHud: document.getElementById('btnFfMarkHud'),
+      btnCommitMarkHud: document.getElementById('btnCommitMarkHud'),
       emptyStage: document.getElementById('emptyStage'),
       taskBanner: document.getElementById('taskBanner'),
       taskMsg: document.getElementById('taskMsg'),
       taskIcon: document.getElementById('taskIcon'),
       taskProgressMini: document.getElementById('taskProgressMini'),
       taskProgressFill: document.getElementById('taskProgressFill'),
+      ctaBanner: document.getElementById('ctaBanner'),
+      btnDirectEdit: document.getElementById('btnDirectEdit'),
+      btnAiAnalyzeCta: document.getElementById('btnAiAnalyzeCta'),
+      metricsBar: document.getElementById('metricsBar'),
+      metricOrigDur: document.getElementById('metricOrigDur'),
+      metricCutDur: document.getElementById('metricCutDur'),
+      metricReduction: document.getElementById('metricReduction'),
+      metricRallyCount: document.getElementById('metricRallyCount'),
+      btnTriggerAiTop: document.getElementById('btnTriggerAiTop'),
+      metricAiBtnText: document.getElementById('metricAiBtnText'),
       activeRallyLabel: document.getElementById('activeRallyLabel'),
       zoomLevelText: document.getElementById('zoomLevelText'),
       zoomOutBtn: document.getElementById('zoomOutBtn'),
@@ -1573,6 +2173,22 @@
       timelineProgressLayer: document.getElementById('timelineProgressLayer'),
       ralliesContainer: document.getElementById('ralliesContainer'),
       playheadNeedle: document.getElementById('playheadNeedle'),
+      floatingZoom: document.getElementById('floatingZoom'),
+      floatZoomOut: document.getElementById('floatZoomOut'),
+      floatZoomText: document.getElementById('floatZoomText'),
+      floatZoomIn: document.getElementById('floatZoomIn'),
+      rallyQuickStrip: document.getElementById('rallyQuickStrip'),
+      btnQuickPrev: document.getElementById('btnQuickPrev'),
+      btnQuickNext: document.getElementById('btnQuickNext'),
+      stripScrollArea: document.getElementById('stripScrollArea'),
+      fineTuneBar: document.getElementById('fineTuneBar'),
+      emptyRallyTipRow: document.getElementById('emptyRallyTipRow'),
+      btnImportFullRally: document.getElementById('btnImportFullRally'),
+      rallyHeaderRow: document.getElementById('rallyHeaderRow'),
+      rallyHeaderTitle: document.getElementById('rallyHeaderTitle'),
+      rallyNeighborGapText: document.getElementById('rallyNeighborGapText'),
+      rallyConfText: document.getElementById('rallyConfText'),
+      tuneControlsRow: document.getElementById('tuneControlsRow'),
       tuneStartMinus: document.getElementById('tuneStartMinus'),
       tuneStartPlus: document.getElementById('tuneStartPlus'),
       tuneEndMinus: document.getElementById('tuneEndMinus'),
@@ -1580,9 +2196,14 @@
       playRallyPill: document.getElementById('playRallyPill'),
       playRallyPillIcon: document.getElementById('playRallyPillIcon'),
       playRallyPillText: document.getElementById('playRallyPillText'),
-      btnAddRally: document.getElementById('btnAddRally'),
+      quickSetRow: document.getElementById('quickSetRow'),
+      btnSetStartAtPlayhead: document.getElementById('btnSetStartAtPlayhead'),
+      btnSetEndAtPlayhead: document.getElementById('btnSetEndAtPlayhead'),
+      btnMarkStart: document.getElementById('btnMarkStart'),
+      btnMarkStartText: document.getElementById('btnMarkStartText'),
+      btnFastForward: document.getElementById('btnFastForward'),
+      btnMarkEnd: document.getElementById('btnMarkEnd'),
       btnSplitRally: document.getElementById('btnSplitRally'),
-      btnMergeRallies: document.getElementById('btnMergeRallies'),
       btnDeleteRally: document.getElementById('btnDeleteRally'),
       btnOpenRalliesSheet: document.getElementById('btnOpenRalliesSheet'),
       rallyCountText: document.getElementById('rallyCountText'),
@@ -1795,6 +2416,25 @@
       showToast(`终点已调整至 ${formatTime(rally.end)} (${deltaSec > 0 ? '+' : ''}${deltaSec}s)`);
     }
 
+    function mergeOverlapping(rallies, marginSec = 0.05) {
+      if (!rallies || rallies.length <= 1) return rallies || [];
+      const sorted = [...rallies].sort((a, b) => a.start - b.start);
+      const result = [];
+      let current = { ...sorted[0] };
+      for (let i = 1; i < sorted.length; i++) {
+        const next = sorted[i];
+        if (next.start <= current.end + marginSec) {
+          current.end = Math.max(current.end, next.end);
+          current.confidence = Math.max(current.confidence ?? 1, next.confidence ?? 1);
+        } else {
+          result.push(current);
+          current = { ...next };
+        }
+      }
+      result.push(current);
+      return result;
+    }
+
     function adjustSelectedRallyStart(deltaSec) {
       const idx = state.selectedRallyIndex;
       if (idx === null || !state.rallies[idx] || !state.duration) return;
@@ -1803,23 +2443,61 @@
       const newStart = Math.max(0, Math.min(rally.end - 0.3, rally.start + deltaSec));
       rally.start = Number(newStart.toFixed(2));
 
-      // 起点微调：如果播放进度在当前新起点之后，保持播放；若播放头被移到新起点之前，才温和拉回到新起点
-      if (elements.videoPlayer.currentTime < rally.start) {
-        elements.videoPlayer.currentTime = rally.start;
-      }
+      // 起点微调：重新试听新起点（匹配 Android 逻辑）
+      elements.videoPlayer.currentTime = rally.start;
+      elements.videoPlayer.play().catch(() => {});
+      updatePlayPauseButton();
 
-      renderTimeline();
-      renderFineTuneBar();
-      renderRallyCardsSheet();
+      state.rallies = mergeOverlapping(state.rallies);
+      state.selectedRallyIndex = state.rallies.findIndex(r => r.start <= rally.start && r.end >= rally.end);
+      if (state.selectedRallyIndex === -1 && state.rallies.length > 0) state.selectedRallyIndex = 0;
+
+      renderAll();
       showToast(`起点已调整至 ${formatTime(rally.start)} (${deltaSec > 0 ? '+' : ''}${deltaSec}s)`);
     }
 
-    // Add Rally at current playhead
-    function addRallyAtPlayhead() {
+    // 标开始 (常驻按钮)
+    function markRangeStart() {
       if (!state.duration) return;
       const cur = elements.videoPlayer.currentTime || 0;
-      const start = Math.max(0, Math.min(state.duration - 0.6, cur));
-      const end = Math.min(state.duration, start + 4.0);
+      state.rangeMarkIn = cur;
+      renderAll();
+      showToast(`已设置起点: ${formatTime(cur)}`);
+    }
+
+    // 取消起点标记
+    function cancelRangeMark() {
+      state.rangeMarkIn = null;
+      renderAll();
+      showToast('已取消标记');
+    }
+
+    // 快进 1.5s (常驻按钮)
+    function fastForward(deltaSec = 1.5) {
+      if (!state.duration) return;
+      const cur = elements.videoPlayer.currentTime || 0;
+      const target = Math.min(state.duration, cur + deltaSec);
+      elements.videoPlayer.currentTime = target;
+      updatePlayheadUI();
+      renderTimeline();
+    }
+
+    // 标结束 (常驻按钮)
+    function markRangeEnd() {
+      if (!state.duration) return;
+      const cur = elements.videoPlayer.currentTime || 0;
+      let start, end;
+      if (state.rangeMarkIn !== null) {
+        start = Math.min(state.rangeMarkIn, cur);
+        end = Math.max(state.rangeMarkIn, cur);
+      } else {
+        start = Math.max(0, cur - 4.0);
+        end = cur;
+      }
+
+      if (end - start < 0.3) {
+        end = Math.min(state.duration, start + 0.5);
+      }
 
       const newRally = {
         id: Date.now(),
@@ -1828,18 +2506,102 @@
         confidence: 1.0,
       };
 
-      state.rallies.push(newRally);
-      state.rallies.sort((a, b) => a.start - b.start);
-      state.selectedRallyIndex = state.rallies.findIndex(r => r.id === newRally.id);
+      const combined = [...state.rallies, newRally];
+      state.rallies = mergeOverlapping(combined);
+      state.selectedRallyIndex = state.rallies.findIndex(r => r.start <= start && r.end >= end);
+      if (state.selectedRallyIndex === -1) {
+        state.selectedRallyIndex = state.rallies.findIndex(r => (start >= r.start && start <= r.end) || (r.start >= start && r.start <= end));
+      }
+      if (state.selectedRallyIndex === -1 && state.rallies.length > 0) state.selectedRallyIndex = state.rallies.length - 1;
 
+      state.rangeMarkIn = null;
       renderAll();
-      showToast(`已在 ${formatTime(start)} 添加新回合`);
+      showToast(`已标记回合 (${formatTime(start)} ~ ${formatTime(end)})`);
+    }
+
+    // 以播头设为起点
+    function setSelectedStartAtPlayhead() {
+      const idx = state.selectedRallyIndex;
+      if (idx === null || !state.rallies[idx] || !state.duration) return;
+      const rally = state.rallies[idx];
+      const cur = elements.videoPlayer.currentTime || 0;
+      if (cur >= rally.end - 0.2) {
+        showToast('起点必须在终点之前至少 0.2s', true);
+        return;
+      }
+      rally.start = Number(cur.toFixed(2));
+      state.rallies = mergeOverlapping(state.rallies);
+      state.selectedRallyIndex = state.rallies.findIndex(r => cur >= r.start && cur <= r.end);
+      if (state.selectedRallyIndex === -1 && state.rallies.length > 0) state.selectedRallyIndex = 0;
+      renderAll();
+      showToast(`已将播头设为起点: ${formatTime(cur)}`);
+    }
+
+    // 以播头设为终点
+    function setSelectedEndAtPlayhead() {
+      const idx = state.selectedRallyIndex;
+      if (idx === null || !state.rallies[idx] || !state.duration) return;
+      const rally = state.rallies[idx];
+      const cur = elements.videoPlayer.currentTime || 0;
+      if (cur <= rally.start + 0.2) {
+        showToast('终点必须在起点之后至少 0.2s', true);
+        return;
+      }
+      rally.end = Number(cur.toFixed(2));
+      state.rallies = mergeOverlapping(state.rallies);
+      state.selectedRallyIndex = state.rallies.findIndex(r => cur >= r.start && cur <= r.end);
+      if (state.selectedRallyIndex === -1 && state.rallies.length > 0) state.selectedRallyIndex = 0;
+      renderAll();
+      showToast(`已将播头设为终点: ${formatTime(cur)}`);
+    }
+
+    // 免识别直接剪辑
+    function startDirectEdit() {
+      if (!state.duration) return;
+      state.isDirectEditing = true;
+      state.rallies = [];
+      state.selectedRallyIndex = null;
+      state.rangeMarkIn = null;
+      closeCourtCalibration();
+      renderAll();
+      showToast('已进入直接剪辑模式，播放视频打点即可');
+    }
+
+    // 导入整片
+    function importFullVideoAsRally() {
+      if (!state.duration) return;
+      state.isDirectEditing = true;
+      state.rallies = [{
+        id: Date.now(),
+        start: 0,
+        end: Number(state.duration.toFixed(2)),
+        confidence: 1.0,
+      }];
+      state.selectedRallyIndex = 0;
+      state.rangeMarkIn = null;
+      renderAll();
+      showToast('已导入整片作为完整回合');
+    }
+
+    // 相对切换回合 (快捷键 [ / ])
+    function selectRelativeRally(delta) {
+      if (state.rallies.length === 0) return;
+      const cur = state.selectedRallyIndex !== null ? state.selectedRallyIndex : (delta > 0 ? -1 : state.rallies.length);
+      const next = Math.max(0, Math.min(state.rallies.length - 1, cur + delta));
+      state.selectedRallyIndex = next;
+      const targetRally = state.rallies[next];
+      elements.videoPlayer.currentTime = targetRally.start;
+      renderAll();
+      scrollToTime(targetRally.start, true);
     }
 
     // Delete selected rally
     function deleteSelectedRally() {
-      const idx = state.selectedRallyIndex;
-      if (idx === null || !state.rallies[idx]) return;
+      const idx = state.selectedRallyIndex ?? state.rallies.findIndex(r => {
+        const cur = elements.videoPlayer.currentTime || 0;
+        return cur >= r.start && cur <= r.end;
+      });
+      if (idx === null || idx === -1 || !state.rallies[idx]) return;
       state.rallies.splice(idx, 1);
       state.selectedRallyIndex = state.rallies.length ? Math.min(idx, state.rallies.length - 1) : null;
       renderAll();
@@ -1848,12 +2610,15 @@
 
     // Split rally at playhead
     function splitSelectedRally() {
-      const idx = state.selectedRallyIndex;
-      if (idx === null || !state.rallies[idx]) return;
-      const rally = state.rallies[idx];
-      const cur = elements.videoPlayer.currentTime;
-      if (cur <= rally.start + 0.3 || cur >= rally.end - 0.3) {
+      const cur = elements.videoPlayer.currentTime || 0;
+      const idx = state.selectedRallyIndex ?? state.rallies.findIndex(r => cur >= r.start + 0.3 && cur <= r.end - 0.3);
+      if (idx === null || idx === -1 || !state.rallies[idx]) {
         showToast('请将播放头移到当前回合内部再拆分', true);
+        return;
+      }
+      const rally = state.rallies[idx];
+      if (cur <= rally.start + 0.3 || cur >= rally.end - 0.3) {
+        showToast('请在距起点和终点至少 0.3s 处拆分', true);
         return;
       }
       const right = {
@@ -1872,21 +2637,9 @@
     // Merge adjacent rallies (< 1.0s gap)
     function mergeAdjacentRallies() {
       if (state.rallies.length < 2) return;
-      const sorted = [...state.rallies].sort((a, b) => a.start - b.start);
-      const merged = [sorted[0]];
-      let mergedCount = 0;
-      for (let i = 1; i < sorted.length; i++) {
-        const prev = merged[merged.length - 1];
-        const curr = sorted[i];
-        if (curr.start - prev.end <= 1.0) {
-          prev.end = Math.max(prev.end, curr.end);
-          prev.confidence = Math.min(prev.confidence ?? 1, curr.confidence ?? 1);
-          mergedCount++;
-        } else {
-          merged.push(curr);
-        }
-      }
-      state.rallies = merged;
+      const prevCount = state.rallies.length;
+      state.rallies = mergeOverlapping(state.rallies, 1.0);
+      const mergedCount = prevCount - state.rallies.length;
       state.selectedRallyIndex = null;
       renderAll();
       showToast(mergedCount > 0 ? `已合并 ${mergedCount} 处碎片回合` : '未发现间隔小于 1.0s 的相邻碎片');
@@ -1964,13 +2717,35 @@
       }
       const fullW = getTimelineWidthPx();
 
-      // Render Rally Blocks
-      elements.ralliesContainer.innerHTML = state.rallies.map((rally, idx) => {
-        const left = (rally.start / state.duration) * fullW;
-        const width = Math.max(6, ((rally.end - rally.start) / state.duration) * fullW);
+      // 1. Render Gap Interval Cards between consecutive rallies (tap-to-seek)
+      let gapsHtml = '';
+      for (let i = 0; i < state.rallies.length - 1; i++) {
+        const curR = state.rallies[i];
+        const nextR = state.rallies[i + 1];
+        const gapSec = nextR.start - curR.end;
+        if (gapSec >= 0.2) {
+          const gapLeft = timeToPx(curR.end);
+          const gapWidth = Math.max(12, timeToPx(nextR.start) - gapLeft);
+          const label = gapWidth >= 48 ? `间隔 ${gapSec.toFixed(1)}s` : (gapWidth >= 24 ? `${gapSec.toFixed(0)}s` : '');
+          gapsHtml += `
+            <div class="timeline-gap" style="left: ${gapLeft}px; width: ${gapWidth}px;" data-gap-seek="${curR.end}" title="点击跳转到非对战片段 (${gapSec.toFixed(1)}s)">
+              ${label ? `<span>${label}</span>` : ''}
+            </div>
+          `;
+        }
+      }
+
+      // 2. Render Rally Blocks with Non-Overlapping Bound Constraint
+      let ralliesHtml = state.rallies.map((rally, idx) => {
+        const left = timeToPx(rally.start);
+        const rawWidth = Math.max(16, timeToPx(rally.end) - left);
+        const nextR = state.rallies[idx + 1];
+        const maxAllowed = nextR ? Math.max(16, (timeToPx(nextR.start) - left) - 3) : (fullW - left);
+        const width = Math.min(rawWidth, maxAllowed);
         const isSelected = state.selectedRallyIndex === idx;
-        const isLowConf = (rally.confidence ?? 1) < 0.8;
+        const isLowConf = (rally.confidence ?? 1) < 0.72;
         const dur = (rally.end - rally.start).toFixed(1);
+        const label = width >= 54 ? `#${idx + 1 < 10 ? '0' : ''}${idx + 1} ${dur}s` : (width >= 28 ? `#${idx + 1}` : `${idx + 1}`);
 
         return `
           <div class="rally-block${isSelected ? ' selected' : ''}${isLowConf ? ' low-confidence' : ''}"
@@ -1979,7 +2754,7 @@
             <div class="rally-handle start-handle" data-handle="start" data-rally-idx="${idx}">
               <div class="handle-pill"></div>
             </div>
-            <span class="rally-label">#${idx + 1} (${dur}s)</span>
+            <span class="rally-label">${label}</span>
             <div class="rally-handle end-handle" data-handle="end" data-rally-idx="${idx}">
               <div class="handle-pill"></div>
             </div>
@@ -1987,11 +2762,27 @@
         `;
       }).join('');
 
+      // 3. Render Active Range Mark Preview Needle & Fill
+      let markHtml = '';
+      if (state.rangeMarkIn !== null) {
+        const cur = elements.videoPlayer.currentTime || 0;
+        const inPx = timeToPx(state.rangeMarkIn);
+        const curPx = timeToPx(cur);
+        const fillL = Math.min(inPx, curPx);
+        const fillW = Math.max(2, Math.abs(curPx - inPx));
+        markHtml = `
+          <div class="range-mark-needle" style="left: ${inPx}px;"></div>
+          <div class="range-mark-fill" style="left: ${fillL}px; width: ${fillW}px;"></div>
+        `;
+      }
+
+      elements.ralliesContainer.innerHTML = gapsHtml + ralliesHtml + markHtml;
+
       // Mini scrub highlights on player
       elements.miniScrubRallies.innerHTML = state.rallies.map(r => {
         const l = (r.start / state.duration) * 100;
         const w = ((r.end - r.start) / state.duration) * 100;
-        const isLow = (r.confidence ?? 1) < 0.8;
+        const isLow = (r.confidence ?? 1) < 0.72;
         return `<div class="mini-rally-mark${isLow ? ' low-conf' : ''}" style="left: ${l}%; width: ${w}%;"></div>`;
       }).join('');
 
@@ -2019,6 +2810,16 @@
           const idx = Number(block.dataset.rallyIdx);
           state.selectedRallyIndex = idx;
           renderAll();
+        });
+      });
+
+      // Add Click Listeners to Gap Cards (Seek directly to gap)
+      elements.ralliesContainer.querySelectorAll('.timeline-gap').forEach(gap => {
+        gap.addEventListener('click', e => {
+          e.stopPropagation();
+          const seekTime = Number(gap.dataset.gapSeek);
+          elements.videoPlayer.currentTime = seekTime;
+          updatePlayheadUI();
         });
       });
 
@@ -2052,6 +2853,7 @@
     document.addEventListener('pointerup', e => {
       if (state.isDraggingRallyHandle) {
         state.isDraggingRallyHandle = null;
+        state.rallies = mergeOverlapping(state.rallies);
         renderAll();
       }
       if (state.courtDragIndex !== null) {
@@ -2064,7 +2866,7 @@
 
     // Timeline Click to Seek
     elements.timelineViewport.addEventListener('click', e => {
-      if (e.target.closest('.rally-block')) return;
+      if (e.target.closest('.rally-block') || e.target.closest('.timeline-gap')) return;
       const rect = elements.timelineCanvas.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       const targetTime = pxToTime(clickX);
@@ -2112,6 +2914,24 @@
         elements.timelineProgressLayer.style.width = `${pct}%`;
         elements.playheadNeedle.style.left = `${timeToPx(cur)}px`;
       }
+
+      // Real-time Range Mark Fill and HUD title
+      if (state.rangeMarkIn !== null) {
+        const fillElem = elements.ralliesContainer.querySelector('.range-mark-fill');
+        if (fillElem) {
+          const inPx = timeToPx(state.rangeMarkIn);
+          const curPx = timeToPx(cur);
+          fillElem.style.left = `${Math.min(inPx, curPx)}px`;
+          fillElem.style.width = `${Math.max(2, Math.abs(curPx - inPx))}px`;
+        }
+        const len = Math.abs(cur - state.rangeMarkIn).toFixed(1);
+        elements.markingHudTitle.textContent = `正在标记回合: 起点 ${formatTime(state.rangeMarkIn)} · 长度 ${len}s`;
+      }
+
+      // Update split button state
+      const selectedRally = state.selectedRallyIndex !== null ? state.rallies[state.selectedRallyIndex] : null;
+      const canSplit = Boolean(selectedRally && cur >= selectedRally.start + 0.3 && cur <= selectedRally.end - 0.3);
+      elements.btnSplitRally.disabled = !canSplit;
     }
 
     // Mini Scrub Dragging on Video HUD
@@ -2132,37 +2952,148 @@
     });
 
     // ==========================================
-    // 4. Fine-Tune Bar & Key Buttons
+    // 4. Metrics Bar & In-Player Marking HUD
     // ==========================================
+    function renderMetricsBar() {
+      if (!state.duration || state.duration <= 0) {
+        elements.ctaBanner.style.display = 'none';
+        elements.metricsBar.style.display = 'none';
+        return;
+      }
+
+      if (state.rallies.length === 0 && !state.isDirectEditing) {
+        elements.ctaBanner.style.display = 'flex';
+        elements.metricsBar.style.display = 'none';
+      } else {
+        elements.ctaBanner.style.display = 'none';
+        elements.metricsBar.style.display = 'flex';
+
+        const totalCutSec = state.rallies.reduce((sum, r) => sum + Math.max(0, r.end - r.start), 0);
+        const reduction = state.duration > 0 ? Math.max(0, Math.round((1 - totalCutSec / state.duration) * 100)) : 0;
+
+        elements.metricOrigDur.textContent = formatTime(state.duration, false);
+        elements.metricCutDur.textContent = formatTime(totalCutSec, false);
+        elements.metricReduction.textContent = `-${reduction}%`;
+        elements.metricRallyCount.textContent = `${state.rallies.length}段`;
+        elements.metricAiBtnText.textContent = state.rallies.length === 0 ? 'AI 识别' : '+AI 识别';
+      }
+    }
+
+    function renderMarkingHud() {
+      if (state.rangeMarkIn !== null) {
+        elements.markingHud.style.display = 'flex';
+        elements.btnMarkStart.classList.add('active-mark');
+        elements.btnMarkStartText.textContent = '已标起点 ●';
+        elements.btnMarkEnd.classList.add('active-mark');
+        elements.btnFastForward.classList.add('active-mark');
+      } else {
+        elements.markingHud.style.display = 'none';
+        elements.btnMarkStart.classList.remove('active-mark');
+        elements.btnMarkStartText.textContent = '标开始';
+        elements.btnMarkEnd.classList.remove('active-mark');
+        elements.btnFastForward.classList.remove('active-mark');
+      }
+    }
+
+    // ==========================================
+    // 5. Quick Switcher Strip & Fine-Tune Bar
+    // ==========================================
+    function renderQuickSwitcherStrip() {
+      if (state.rallies.length === 0) {
+        elements.stripScrollArea.innerHTML = `<div style="font-size: 11px; color: var(--text-muted); padding-left: 4px;">暂无回合，使用下方按钮标记或导入整片</div>`;
+        elements.btnQuickPrev.disabled = true;
+        elements.btnQuickNext.disabled = true;
+        return;
+      }
+
+      const idx = state.selectedRallyIndex;
+      elements.btnQuickPrev.disabled = idx === null || idx <= 0;
+      elements.btnQuickNext.disabled = idx === null || idx >= state.rallies.length - 1;
+
+      let html = '';
+      state.rallies.forEach((r, i) => {
+        if (i > 0) {
+          const gapSec = r.start - state.rallies[i - 1].end;
+          if (gapSec >= 0.2) {
+            html += `<span class="strip-gap-tag">${gapSec >= 1.0 ? gapSec.toFixed(0) : gapSec.toFixed(1)}s</span>`;
+          }
+        }
+        const isSel = idx === i;
+        const isLow = (r.confidence ?? 1) < 0.72;
+        const dur = (r.end - r.start).toFixed(1);
+        html += `
+          <div class="strip-pill${isSel ? ' selected' : ''}${isLow ? ' low-conf' : ''}" data-quick-idx="${i}">
+            <span class="strip-pill-dot"></span>
+            <span>#${i + 1 < 10 ? '0' : ''}${i + 1} ${dur}s</span>
+          </div>
+        `;
+      });
+      elements.stripScrollArea.innerHTML = html;
+
+      elements.stripScrollArea.querySelectorAll('.strip-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+          const i = Number(pill.dataset.quickIdx);
+          state.selectedRallyIndex = i;
+          elements.videoPlayer.currentTime = state.rallies[i].start;
+          renderAll();
+        });
+      });
+
+      const selectedPill = elements.stripScrollArea.querySelector('.strip-pill.selected');
+      if (selectedPill) {
+        selectedPill.scrollIntoView({ behavior: 'smooth', inline: 'nearest', block: 'nearest' });
+      }
+    }
+
     function renderFineTuneBar() {
       const idx = state.selectedRallyIndex;
       const hasRally = idx !== null && Boolean(state.rallies[idx]);
 
-      elements.tuneStartMinus.disabled = !hasRally;
-      elements.tuneStartPlus.disabled = !hasRally;
-      elements.tuneEndMinus.disabled = !hasRally;
-      elements.tuneEndPlus.disabled = !hasRally;
       elements.btnDeleteRally.disabled = !hasRally;
-      elements.btnSplitRally.disabled = !hasRally;
-      elements.btnMergeRallies.disabled = state.rallies.length < 2;
       elements.btnOpenExportSheet.disabled = state.rallies.length === 0;
 
       if (hasRally) {
         const r = state.rallies[idx];
-        const isLow = (r.confidence ?? 1) < 0.8;
+        const isLow = (r.confidence ?? 1) < 0.72;
+        elements.emptyRallyTipRow.style.display = 'none';
+        elements.rallyHeaderRow.style.display = 'flex';
+        elements.tuneControlsRow.style.display = 'flex';
+        elements.quickSetRow.style.display = 'flex';
+
+        elements.rallyHeaderTitle.textContent = `第 ${idx + 1 < 10 ? '0' : ''}${idx + 1} / ${state.rallies.length < 10 ? '0' : ''}${state.rallies.length} 回合 (${formatTime(r.start)} - ${formatTime(r.end)} · ${(r.end - r.start).toFixed(1)}s)`;
+
+        const prevGap = idx > 0 ? r.start - state.rallies[idx - 1].end : null;
+        const nextGap = idx < state.rallies.length - 1 ? state.rallies[idx + 1].start - r.end : null;
+        if (prevGap !== null && prevGap >= 0.1) {
+          elements.rallyNeighborGapText.textContent = `距上段 ${prevGap.toFixed(1)}s`;
+        } else if (nextGap !== null && nextGap >= 0.1) {
+          elements.rallyNeighborGapText.textContent = `距下段 ${nextGap.toFixed(1)}s`;
+        } else {
+          elements.rallyNeighborGapText.textContent = '';
+        }
+
+        elements.rallyConfText.textContent = `置信度 ${Math.round((r.confidence ?? 1) * 100)}%`;
+        elements.playRallyPillText.textContent = `播放 #${idx + 1}`;
+
         elements.activeRallyLabel.className = `active-rally-tag${isLow ? ' amber' : ''}`;
         elements.activeRallyLabel.innerHTML = `
           <i data-lucide="scissors"></i>
           <span>回合 #${idx + 1} (${formatTime(r.start)} ~ ${formatTime(r.end)} · ${(r.end - r.start).toFixed(1)}s)</span>
         `;
-        elements.playRallyPillText.textContent = `播放 #${idx + 1}`;
       } else {
+        elements.emptyRallyTipRow.style.display = 'flex';
+        elements.rallyHeaderRow.style.display = 'none';
+        elements.tuneControlsRow.style.display = 'none';
+        elements.quickSetRow.style.display = 'none';
+
         elements.activeRallyLabel.className = 'active-rally-tag empty';
-        elements.activeRallyLabel.innerHTML = `<i data-lucide="info"></i><span>未选择回合（点击时间轴选择或点击+回合）</span>`;
+        elements.activeRallyLabel.innerHTML = `<i data-lucide="info"></i><span>未选择回合（点击时间轴选择或使用下方标记）</span>`;
         elements.playRallyPillText.textContent = '播放视频';
       }
 
       elements.rallyCountText.textContent = `回合 (${state.rallies.length})`;
+      elements.floatZoomText.textContent = `${state.timelineZoom.toFixed(1)}x`;
+      elements.zoomLevelText.textContent = `${Math.round(state.timelineZoom * 100)}%`;
       refreshIcons();
     }
 
@@ -2328,6 +3259,8 @@
       state.rallies = [];
       state.selectedRallyIndex = null;
       state.rallyPlaybackEnd = null;
+      state.rangeMarkIn = null;
+      state.isDirectEditing = false;
       state.objectUrl = URL.createObjectURL(file);
 
       elements.videoPlayer.src = state.objectUrl;
@@ -2339,9 +3272,9 @@
         const uploaded = await uploadVideo(file);
         state.taskId = uploaded.task_id;
         state.duration = Number(uploaded.duration) || elements.videoPlayer.duration || 0;
-        setTaskBanner('上传完成，请标定球场后开始分析', 'success');
+        setTaskBanner('视频载入完成，可免识别直接剪辑或启动智能识别', 'success');
+        setTimeout(hideTaskBanner, 3000);
         renderAll();
-        openCourtCalibration();
       } catch (err) {
         setTaskBanner(err.message || '视频上传失败', 'error');
         showToast(err.message || '上传失败', true);
@@ -2536,6 +3469,9 @@
     function renderAll() {
       renderTimeline();
       renderFineTuneBar();
+      renderQuickSwitcherStrip();
+      renderMetricsBar();
+      renderMarkingHud();
       updateCourtBounds();
       refreshIcons();
     }
@@ -2674,6 +3610,11 @@
     });
     elements.courtConfirmBtn.addEventListener('click', triggerAiAnalysis);
 
+    // Call-to-action & Top Metrics Bar
+    elements.btnDirectEdit.addEventListener('click', startDirectEdit);
+    elements.btnAiAnalyzeCta.addEventListener('click', openCourtCalibration);
+    elements.btnTriggerAiTop.addEventListener('click', openCourtCalibration);
+
     // Zoom Buttons
     elements.zoomInBtn.addEventListener('click', () => setZoom(state.timelineZoom * 1.5));
     elements.zoomOutBtn.addEventListener('click', () => setZoom(state.timelineZoom / 1.5));
@@ -2681,6 +3622,12 @@
     elements.seekPlayheadBtn.addEventListener('click', () => {
       scrollToTime(elements.videoPlayer.currentTime, true);
     });
+    elements.floatZoomIn.addEventListener('click', () => setZoom(state.timelineZoom * 1.35));
+    elements.floatZoomOut.addEventListener('click', () => setZoom(state.timelineZoom / 1.35));
+
+    // Quick Switcher Strip
+    elements.btnQuickPrev.addEventListener('click', () => selectRelativeRally(-1));
+    elements.btnQuickNext.addEventListener('click', () => selectRelativeRally(1));
 
     // Fine-Tuning Actions (Dynamic Non-Restart Extension)
     elements.tuneStartMinus.addEventListener('click', () => adjustSelectedRallyStart(-0.5));
@@ -2695,10 +3642,21 @@
       }
     });
 
-    // Main Keys
-    elements.btnAddRally.addEventListener('click', addRallyAtPlayhead);
+    // Quick Set & Direct Edit
+    elements.btnImportFullRally.addEventListener('click', importFullVideoAsRally);
+    elements.btnSetStartAtPlayhead.addEventListener('click', setSelectedStartAtPlayhead);
+    elements.btnSetEndAtPlayhead.addEventListener('click', setSelectedEndAtPlayhead);
+
+    // In-Player Marking HUD
+    elements.btnCancelMarkHud.addEventListener('click', cancelRangeMark);
+    elements.btnFfMarkHud.addEventListener('click', () => fastForward(1.5));
+    elements.btnCommitMarkHud.addEventListener('click', markRangeEnd);
+
+    // Main 7 Keys
+    elements.btnMarkStart.addEventListener('click', markRangeStart);
+    elements.btnFastForward.addEventListener('click', () => fastForward(1.5));
+    elements.btnMarkEnd.addEventListener('click', markRangeEnd);
     elements.btnSplitRally.addEventListener('click', splitSelectedRally);
-    elements.btnMergeRallies.addEventListener('click', mergeAdjacentRallies);
     elements.btnDeleteRally.addEventListener('click', deleteSelectedRally);
     elements.btnOpenRalliesSheet.addEventListener('click', openRallySheet);
     elements.btnOpenExportSheet.addEventListener('click', openExportSheet);
@@ -2712,24 +3670,62 @@
     // Export Submit
     elements.exportSubmitBtn.addEventListener('click', submitExport);
 
-    // Keyboard Shortcuts (Desktop Accessibility)
+    // Comprehensive Desktop Keyboard Shortcuts (macOS & Windows)
     window.addEventListener('keydown', e => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.isContentEditable) return;
+
       if (e.code === 'Space') {
         e.preventDefault();
         togglePlay();
-      } else if (e.code === 'ArrowLeft') {
-        seekRelative(-1.0);
-      } else if (e.code === 'ArrowRight') {
-        seekRelative(1.0);
+      } else if (e.key === 'i' || e.key === 'I') {
+        e.preventDefault();
+        markRangeStart();
+      } else if (e.key === 'o' || e.key === 'O') {
+        e.preventDefault();
+        markRangeEnd();
+      } else if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        fastForward(1.5);
+      } else if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        splitSelectedRally();
       } else if (e.code === 'Delete' || e.code === 'Backspace') {
         deleteSelectedRally();
-      } else if (e.key === 's' || e.key === 'S') {
-        splitSelectedRally();
       } else if (e.key === '[') {
-        adjustSelectedRallyStart(-0.5);
+        e.preventDefault();
+        selectRelativeRally(-1);
       } else if (e.key === ']') {
-        adjustSelectedRallyEnd(0.5);
+        e.preventDefault();
+        selectRelativeRally(1);
+      } else if (e.key === 'p' || e.key === 'P') {
+        e.preventDefault();
+        playSelectedRally();
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        seekRelative(e.shiftKey ? -0.1 : -1.0);
+      } else if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        seekRelative(e.shiftKey ? 0.1 : 1.0);
+      } else if (e.code === 'Escape') {
+        if (state.rangeMarkIn !== null) {
+          cancelRangeMark();
+        } else {
+          closeRallySheet();
+          closeExportSheet();
+          closeCourtCalibration();
+        }
+      } else if (e.key === '1') {
+        elements.speedMenu.querySelector('[data-speed="1.0"]')?.click();
+      } else if (e.key === '2') {
+        elements.speedMenu.querySelector('[data-speed="1.25"]')?.click();
+      } else if (e.key === '3') {
+        elements.speedMenu.querySelector('[data-speed="1.5"]')?.click();
+      } else if (e.key === '4') {
+        elements.speedMenu.querySelector('[data-speed="2.0"]')?.click();
+      } else if (e.key === '-' || e.key === '_') {
+        setZoom(state.timelineZoom / 1.35);
+      } else if (e.key === '=' || e.key === '+') {
+        setZoom(state.timelineZoom * 1.35);
       }
     });
 
