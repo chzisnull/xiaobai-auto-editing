@@ -2,17 +2,21 @@ package icu.yuqiuyijiaren.xiaobai.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +35,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import icu.yuqiuyijiaren.xiaobai.domain.Rally
@@ -75,7 +80,16 @@ fun ZoomableRallyTimeline(
         return
     }
 
-    var zoom by remember { mutableFloatStateOf(2.2f) }
+    val defaultZoom = remember(durationSec) {
+        if (durationSec > 0.0) {
+            val targetDpPerSec = 5.5f
+            val desiredWidth = (durationSec * targetDpPerSec).toFloat()
+            (desiredWidth / 380f).coerceIn(2.0f, 20.0f)
+        } else {
+            2.2f
+        }
+    }
+    var zoom by remember(defaultZoom) { mutableFloatStateOf(defaultZoom) }
     val scroll = rememberScrollState()
     val density = LocalDensity.current
 
@@ -95,7 +109,6 @@ fun ZoomableRallyTimeline(
         val viewportWidth = maxWidth
         val canvasWidth = viewportWidth * zoom
         val canvasWidthPx = with(density) { canvasWidth.toPx() }
-        val minBlockPx = with(density) { 40.dp.toPx() }
 
         fun timeToX(time: Double, widthPx: Float): Float =
             ((time / durationSec).toFloat().coerceIn(0f, 1f) * widthPx)
@@ -120,7 +133,7 @@ fun ZoomableRallyTimeline(
                 .padding(horizontal = 12.dp, vertical = 8.dp)
                 .pointerInput(durationSec, canvasWidth) {
                     detectTapGestures(
-                        onDoubleTap = { zoom = 2.2f },
+                        onDoubleTap = { zoom = defaultZoom },
                         onTap = { offset ->
                             val time = xToTime(offset.x, size.width.toFloat())
                             val hit = rallies.indexOfLast { time in it.startSec..it.endSec }
@@ -219,12 +232,80 @@ fun ZoomableRallyTimeline(
                 }
             }
 
+            // 1. Gap / Interval indicators between consecutive rallies
+            for (i in 0 until rallies.size - 1) {
+                val rCurrent = rallies[i]
+                val rNext = rallies[i + 1]
+                val gapSec = rNext.startSec - rCurrent.endSec
+                if (gapSec >= 0.2) {
+                    val gapStartRatio = (rCurrent.endSec / durationSec).toFloat().coerceIn(0f, 1f)
+                    val gapEndRatio = (rNext.startSec / durationSec).toFloat().coerceIn(0f, 1f)
+                    val gapWidthRatio = (gapEndRatio - gapStartRatio).coerceAtLeast(0f)
+                    val gapWidthDp = canvasWidth * gapWidthRatio
+
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(top = 10.dp)
+                            .offset(x = canvasWidth * gapStartRatio)
+                            .width(gapWidthDp)
+                            .height(if (compact) 36.dp else 48.dp)
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0x0EFFFFFF))
+                            .border(
+                                width = 1.dp,
+                                color = Color(0x1AFFFFFF),
+                                shape = RoundedCornerShape(6.dp),
+                            )
+                            .pointerInput(rCurrent.id) {
+                                detectTapGestures {
+                                    onSeek(rCurrent.endSec + gapSec / 2.0)
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (gapWidthDp >= 44.dp) {
+                            Text(
+                                text = "间隔 %.1fs".format(gapSec),
+                                color = Color(0xFFA2A2AB),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                            )
+                        } else if (gapWidthDp >= 24.dp) {
+                            Text(
+                                text = "%.0fs".format(gapSec),
+                                color = Color(0xFF8E8E93),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Medium,
+                                maxLines = 1,
+                            )
+                        }
+                    }
+                }
+            }
+
+            // 2. Rally blocks with accurate time bounds and clear labels
             rallies.forEachIndexed { index, rally ->
                 val startRatio = (rally.startSec / durationSec).toFloat().coerceIn(0f, 1f)
                 val endRatio = (rally.endSec / durationSec).toFloat().coerceIn(0f, 1f)
-                val rawWidth = (endRatio - startRatio).coerceAtLeast(0f)
-                val minRatio = (minBlockPx / canvasWidthPx).coerceIn(0.01f, 0.08f)
-                val widthRatio = rawWidth.coerceAtLeast(minRatio)
+                val rawWidthDp = canvasWidth * (endRatio - startRatio).coerceAtLeast(0f)
+
+                // Enforce minimum width without ever encroaching into the next rally or gap
+                val nextRally = rallies.getOrNull(index + 1)
+                val maxAllowedWidthDp = if (nextRally != null) {
+                    val nextStartRatio = (nextRally.startSec / durationSec).toFloat().coerceIn(0f, 1f)
+                    val gapToNextRatio = (nextStartRatio - startRatio).coerceAtLeast(0f)
+                    val gapSec = nextRally.startSec - rally.endSec
+                    if (gapSec > 0.1) {
+                        (canvasWidth * gapToNextRatio - 3.dp).coerceAtLeast(rawWidthDp)
+                    } else {
+                        canvasWidth * gapToNextRatio
+                    }
+                } else {
+                    canvasWidth * (1f - startRatio)
+                }
+                val widthDp = rawWidthDp.coerceAtLeast(16.dp).coerceAtMost(maxAllowedWidthDp)
                 val color = if (rally.confidence < 0.72) Amber else Green
                 val selected = selectedIndex == index
                 Box(
@@ -232,7 +313,7 @@ fun ZoomableRallyTimeline(
                         .align(Alignment.TopStart)
                         .padding(top = 10.dp)
                         .offset(x = canvasWidth * startRatio)
-                        .width(canvasWidth * widthRatio)
+                        .width(widthDp)
                         .height(if (compact) 36.dp else 48.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(color.copy(alpha = if (selected) 0.95f else 0.45f))
@@ -247,14 +328,33 @@ fun ZoomableRallyTimeline(
                                 onSeek(rally.startSec)
                             }
                         },
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = "#%02d".format(index + 1),
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                        modifier = Modifier.align(Alignment.Center),
-                    )
+                    if (widthDp >= 50.dp) {
+                        Text(
+                            text = "#%02d %.1fs".format(index + 1, rally.durationSec),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                    } else if (widthDp >= 26.dp) {
+                        Text(
+                            text = "#%02d".format(index + 1),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                    } else {
+                        Text(
+                            text = "${index + 1}",
+                            color = Color.White,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
 
@@ -280,6 +380,48 @@ fun ZoomableRallyTimeline(
                         .offset(x = canvasWidth * (t / durationSec).toFloat())
                         .padding(bottom = 2.dp),
                 )
+            }
+        }
+
+        // Floating Zoom Controller (pinned bottom-right of timeline container)
+        Row(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 8.dp, bottom = 4.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(Color(0xCC1A1A24))
+                .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(6.dp))
+                .padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0x22FFFFFF))
+                    .clickable { zoom = (zoom / 1.35f).coerceIn(1.0f, 32f) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("-", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            }
+
+            Text(
+                text = "%.1fx".format(zoom),
+                color = Muted,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+            )
+
+            Box(
+                modifier = Modifier
+                    .size(20.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0x22FFFFFF))
+                    .clickable { zoom = (zoom * 1.35f).coerceIn(1.0f, 32f) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("+", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -72,4 +72,31 @@ class RallyTest {
         assertEquals(1.0, merged[0].startSec, 1e-6)
         assertEquals(6.0, merged[0].endSec, 1e-6)
     }
+
+    @Test
+    fun directMarkingDoesNotDefaultToZero() {
+        val markIn = 20.0
+        val t = 42.0
+        val rally = Rally(
+            id = 100,
+            startSec = minOf(markIn, t),
+            endSec = maxOf(markIn, t),
+            confidence = 1.0,
+        )
+        val rallies = emptyList<Rally>()
+        val combined = rallies + rally
+        val merged = combined.mergeOverlapping()
+
+        assertEquals(1, merged.size)
+        assertEquals(20.0, merged[0].startSec, 1e-6)
+        assertEquals(42.0, merged[0].endSec, 1e-6)
+    }
+
+    @Test
+    fun gapCalculationBetweenRallies() {
+        val r1 = Rally(id = 1, startSec = 10.0, endSec = 25.0)
+        val r2 = Rally(id = 2, startSec = 40.0, endSec = 55.0)
+        val gap = r2.startSec - r1.endSec
+        assertEquals(15.0, gap, 1e-6)
+    }
 }

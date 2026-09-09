@@ -167,12 +167,14 @@ sealed interface EditorEvent {
     data object TogglePlayPause : EditorEvent
     data class FastForward(val deltaSec: Double = 1.5) : EditorEvent
     data object StartDirectEdit : EditorEvent
+    data object ImportFullVideoAsRally : EditorEvent
     data object ClearAllRallies : EditorEvent
 }
 
 data class EditorUiState(
     val source: VideoSource? = null,
     val rallies: List<Rally> = emptyList(),
+    val isDirectEditing: Boolean = false,
     val selectedRallyIndex: Int? = null,
     val playheadSec: Double = 0.0,
     val isPlaying: Boolean = false,

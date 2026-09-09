@@ -11,8 +11,8 @@ android {
         applicationId = "icu.yuqiuyijiaren.xiaobai"
         minSdk = 26
         targetSdk = 34
-        versionCode = 14
-        versionName = "0.5.2-android"
+        versionCode = 15
+        versionName = "0.5.3-android"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
     }

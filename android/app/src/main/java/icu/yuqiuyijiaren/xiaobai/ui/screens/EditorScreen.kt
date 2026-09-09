@@ -581,7 +581,7 @@ private fun StatusAndAnalysisBanner(state: EditorUiState, viewModel: EditorViewM
                 )
             }
         }
-    } else if (state.source != null && state.rallies.isEmpty()) {
+    } else if (state.source != null && state.rallies.isEmpty() && !state.isDirectEditing) {
         // Direct Edit & AI Analysis Call to Action
         Box(
             modifier = Modifier
@@ -629,7 +629,7 @@ private fun StatusAndAnalysisBanner(state: EditorUiState, viewModel: EditorViewM
                 }
             }
         }
-    } else if (state.rallies.isNotEmpty()) {
+    } else if (state.rallies.isNotEmpty() || state.isDirectEditing) {
         // Metric Chips + AI Option
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -653,7 +653,7 @@ private fun StatusAndAnalysisBanner(state: EditorUiState, viewModel: EditorViewM
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Blue, modifier = Modifier.size(13.dp))
                     Spacer(Modifier.width(2.dp))
-                    Text("AI识别", color = Blue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(if (state.rallies.isEmpty()) "AI识别" else "+AI识别", color = Blue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -794,6 +794,26 @@ private fun RallyQuickSwitchStrip(
                 val borderCol = if (isSelected) Blue else Color(0x22FFFFFF)
                 val textCol = if (isSelected) Color.White else Ink.copy(alpha = 0.85f)
                 val dotCol = if (r.confidence >= 0.7) Green else Amber
+
+                if (idx > 0) {
+                    val gapSec = r.startSec - rallies[idx - 1].endSec
+                    if (gapSec >= 0.2) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0x14FFFFFF))
+                                .padding(horizontal = 4.dp, vertical = 2.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                text = if (gapSec >= 1.0) "%.0fs".format(gapSec) else "%.1fs".format(gapSec),
+                                color = Muted.copy(alpha = 0.75f),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Normal,
+                            )
+                        }
+                    }
+                }
 
                 Row(
                     modifier = Modifier
@@ -968,11 +988,29 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                         )
                     }
 
-                    Text(
-                        "置信度 %d%%".format((rally.confidence * 100).roundToInt()),
-                        color = Muted,
-                        fontSize = 10.sp,
-                    )
+                    val prevGap = if (index > 0) rally.startSec - state.rallies[index - 1].endSec else null
+                    val nextGap = if (index < state.rallies.lastIndex) state.rallies[index + 1].startSec - rally.endSec else null
+
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (prevGap != null && prevGap >= 0.1) {
+                            Text(
+                                "距上段 %.1fs".format(prevGap),
+                                color = Color(0xFFA2A2AB),
+                                fontSize = 10.sp,
+                            )
+                        } else if (nextGap != null && nextGap >= 0.1) {
+                            Text(
+                                "距下段 %.1fs".format(nextGap),
+                                color = Color(0xFFA2A2AB),
+                                fontSize = 10.sp,
+                            )
+                        }
+                        Text(
+                            "置信度 %d%%".format((rally.confidence * 100).roundToInt()),
+                            color = Muted,
+                            fontSize = 10.sp,
+                        )
+                    }
                 }
 
                 // Main Trim Control Bar: [起点 -0.5s / +0.5s]  [▶ 播本段]  [终点 -0.5s / +0.5s]
@@ -1162,7 +1200,7 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = "尚未划分回合，可导入整片直接剪辑，或用下方按钮标记",
+                    text = "💡 播放视频到精彩处，点击底部 [标开始] 和 [标结束] 即可标记回合",
                     color = Muted,
                     fontSize = 12.sp,
                     modifier = Modifier.weight(1f, fill = false),
@@ -1173,13 +1211,13 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color(0x22FFFFFF))
                         .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
-                        .clickable { viewModel.onEvent(EditorEvent.StartDirectEdit) }
+                        .clickable { viewModel.onEvent(EditorEvent.ImportFullVideoAsRally) }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.ContentCut, contentDescription = null, tint = Ink, modifier = Modifier.size(14.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text("全片直接剪", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("导入整片", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -1457,7 +1495,7 @@ private fun RalliesBottomSheetContent(
                                 .background(Blue.copy(alpha = 0.2f))
                                 .border(1.dp, Blue, RoundedCornerShape(8.dp))
                                 .clickable {
-                                    viewModel.onEvent(EditorEvent.StartDirectEdit)
+                                    viewModel.onEvent(EditorEvent.ImportFullVideoAsRally)
                                     onClose()
                                 }
                                 .padding(horizontal = 14.dp, vertical = 8.dp),

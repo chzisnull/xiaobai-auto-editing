@@ -127,6 +127,7 @@ class EditorViewModel(
             EditorEvent.TogglePlayPause -> togglePlayPause()
             is EditorEvent.FastForward -> fastForward(event.deltaSec)
             EditorEvent.StartDirectEdit -> startDirectEdit()
+            EditorEvent.ImportFullVideoAsRally -> importFullVideoAsRally()
             EditorEvent.ClearAllRallies -> clearAllRallies()
         }
     }
@@ -221,6 +222,7 @@ class EditorViewModel(
         analysisJob = viewModelScope.launch {
             _uiState.update {
                 it.copy(
+                    isDirectEditing = false,
                     rallies = emptyList(),
                     selectedRallyIndex = null,
                     exportPath = null,
@@ -591,7 +593,6 @@ class EditorViewModel(
         val duration = _uiState.value.source?.durationSec ?: return
         val t = _uiState.value.playheadSec
         val markIn = _uiState.value.rangeMarkInSec
-        val selected = _uiState.value.selectedRally
 
         val start: Double
         val end: Double
@@ -599,10 +600,8 @@ class EditorViewModel(
         if (markIn != null) {
             start = minOf(markIn, t)
             end = maxOf(markIn, t)
-        } else if (selected != null && t > selected.startSec) {
-            start = selected.startSec
-            end = t
         } else {
+            // No mark-in set: capture preceding 4 seconds ending at playhead
             start = maxOf(0.0, t - 4.0)
             end = t
         }
@@ -617,11 +616,7 @@ class EditorViewModel(
         ).clamp(duration)
 
         _uiState.update { state ->
-            val combined = if (markIn == null && selected != null && t > selected.startSec) {
-                state.rallies.filter { it.id != selected.id } + rally
-            } else {
-                state.rallies + rally
-            }
+            val combined = state.rallies + rally
             val merged = combined.mergeOverlapping()
             val newIdx = merged.indexOfFirst {
                 (start in it.startSec..it.endSec) || (it.startSec in start..safeEnd)
@@ -692,6 +687,20 @@ class EditorViewModel(
     }
 
     private fun startDirectEdit() {
+        if (_uiState.value.source == null) return
+        pushUndo()
+        _uiState.update { state ->
+            state.copy(
+                isDirectEditing = true,
+                rallies = emptyList(),
+                selectedRallyIndex = null,
+                rangeMarkInSec = null,
+                rangeMarkOutSec = null,
+            )
+        }
+    }
+
+    private fun importFullVideoAsRally() {
         val duration = _uiState.value.source?.durationSec ?: return
         if (duration <= 0.0) return
         pushUndo()
@@ -703,6 +712,7 @@ class EditorViewModel(
         )
         _uiState.update { state ->
             state.copy(
+                isDirectEditing = true,
                 rallies = listOf(fullRally),
                 selectedRallyIndex = 0,
                 rangeMarkInSec = null,
