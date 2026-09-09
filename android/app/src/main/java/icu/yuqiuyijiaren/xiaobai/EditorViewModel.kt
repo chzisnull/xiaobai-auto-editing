@@ -121,6 +121,8 @@ class EditorViewModel(
                 it.copy(exportPath = null, exportGalleryName = null, shareRequested = false)
             }
             EditorEvent.ClearPlaybackCommand -> _uiState.update { it.copy(playback = null) }
+            is EditorEvent.SetIsPlaying -> _uiState.update { it.copy(isPlaying = event.isPlaying) }
+            EditorEvent.PausePlayback -> pausePlayback()
         }
     }
 
@@ -375,26 +377,98 @@ class EditorViewModel(
         _uiState.update { state ->
             val rally = state.rallies[index]
             val next = state.rallies.toMutableList()
+            val newStart = if (startDelta != 0.0) {
+                (rally.startSec + startDelta).coerceIn(0.0, rally.endSec - 0.2)
+            } else rally.startSec
+            val newEnd = if (endDelta != 0.0) {
+                (rally.endSec + endDelta).coerceIn(newStart + 0.2, duration)
+            } else rally.endSec
+
             val updatedRally = rally.copy(
-                startSec = (rally.startSec + startDelta).coerceAtLeast(0.0),
-                endSec = (rally.endSec + endDelta).coerceAtMost(duration),
+                startSec = newStart,
+                endSec = newEnd,
             ).clamp(duration)
             next[index] = updatedRally
 
-            val currentPlayback = state.playback
-            val nextPlayback = if (currentPlayback != null && endDelta > 0) {
-                playbackToken += 1L
-                currentPlayback.copy(
+            playbackToken += 1L
+            val nextPlayback: PlaybackCommand?
+            val nextPlayhead: Double
+
+            if (startDelta != 0.0) {
+                // User requirement: "如果起点-0.5s则从起点-0.5s重新开始播放"
+                // Seek to the new start and start playing until endSec
+                nextPlayhead = updatedRally.startSec
+                nextPlayback = PlaybackCommand(
                     token = playbackToken,
-                    seekSec = state.playheadSec,
+                    seekSec = updatedRally.startSec,
                     playUntilSec = updatedRally.endSec,
                     autoPlay = true,
                 )
+            } else if (endDelta > 0.0) {
+                // User requirement: "比如我正在播放第二片段点击终点+0.5s 那应该继续播放第二片段直到终点"
+                val isPlaying = state.isPlaying
+                val currentPlayhead = state.playheadSec
+
+                if (isPlaying) {
+                    // Actively playing: do NOT seek (prevent stutter/frame drop), smoothly continue to new endSec
+                    nextPlayhead = currentPlayhead
+                    nextPlayback = PlaybackCommand(
+                        token = playbackToken,
+                        seekSec = null,
+                        playUntilSec = updatedRally.endSec,
+                        autoPlay = true,
+                    )
+                } else {
+                    // Paused at or near the end (or within rally): resume forward to new endSec
+                    val resumeSec = if (currentPlayhead >= rally.endSec - 0.25) {
+                        (rally.endSec - 0.15).coerceAtLeast(updatedRally.startSec)
+                    } else if (currentPlayhead >= updatedRally.startSec) {
+                        currentPlayhead
+                    } else {
+                        (rally.endSec - 0.5).coerceAtLeast(updatedRally.startSec)
+                    }
+                    nextPlayhead = resumeSec
+                    nextPlayback = PlaybackCommand(
+                        token = playbackToken,
+                        seekSec = resumeSec,
+                        playUntilSec = updatedRally.endSec,
+                        autoPlay = true,
+                    )
+                }
+            } else if (endDelta < 0.0) {
+                // Shortened end
+                val isPlaying = state.isPlaying
+                val currentPlayhead = state.playheadSec
+                if (currentPlayhead >= updatedRally.endSec - 0.05) {
+                    nextPlayhead = updatedRally.endSec
+                    nextPlayback = PlaybackCommand(
+                        token = playbackToken,
+                        seekSec = updatedRally.endSec,
+                        playUntilSec = updatedRally.endSec,
+                        autoPlay = false,
+                    )
+                } else if (isPlaying) {
+                    nextPlayhead = currentPlayhead
+                    nextPlayback = PlaybackCommand(
+                        token = playbackToken,
+                        seekSec = null,
+                        playUntilSec = updatedRally.endSec,
+                        autoPlay = true,
+                    )
+                } else {
+                    nextPlayhead = currentPlayhead
+                    nextPlayback = null
+                }
             } else {
-                currentPlayback
+                nextPlayhead = state.playheadSec
+                nextPlayback = null
             }
 
-            state.copy(rallies = next, playback = nextPlayback)
+            state.copy(
+                rallies = next,
+                playheadSec = nextPlayhead,
+                playback = nextPlayback,
+            )
         }
     }
 
@@ -522,15 +596,35 @@ class EditorViewModel(
         }
     }
 
-    private fun playSelected() {
-        val rally = _uiState.value.selectedRally ?: return
+    private fun pausePlayback() {
         playbackToken += 1L
         _uiState.update {
             it.copy(
-                playheadSec = rally.startSec,
+                isPlaying = false,
                 playback = PlaybackCommand(
                     token = playbackToken,
-                    seekSec = rally.startSec,
+                    seekSec = null,
+                    autoPlay = false,
+                ),
+            )
+        }
+    }
+
+    private fun playSelected() {
+        val rally = _uiState.value.selectedRally ?: return
+        playbackToken += 1L
+        val currentPlayhead = _uiState.value.playheadSec
+        val startFrom = if (currentPlayhead >= rally.startSec && currentPlayhead < rally.endSec - 0.2) {
+            currentPlayhead
+        } else {
+            rally.startSec
+        }
+        _uiState.update {
+            it.copy(
+                playheadSec = startFrom,
+                playback = PlaybackCommand(
+                    token = playbackToken,
+                    seekSec = startFrom,
                     playUntilSec = rally.endSec,
                     autoPlay = true,
                 ),

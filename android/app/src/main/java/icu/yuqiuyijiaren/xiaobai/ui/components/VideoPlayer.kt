@@ -90,6 +90,7 @@ fun LocalVideoPlayer(
     source: VideoSource?,
     playheadSec: Double,
     onPlayheadChange: (Double) -> Unit,
+    onIsPlayingChange: (Boolean) -> Unit = {},
     playback: PlaybackCommand? = null,
     onPlaybackConsumed: () -> Unit = {},
     rallies: List<Rally> = emptyList(),
@@ -123,6 +124,7 @@ fun LocalVideoPlayer(
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+                onIsPlayingChange(playing)
             }
         }
         player.addListener(listener)
@@ -161,16 +163,22 @@ fun LocalVideoPlayer(
         lastEmittedSec = playheadSec
     }
 
-    // Playback command from outside (e.g. PlaySelected)
+    // Playback command from outside (e.g. PlaySelected, Start/End Nudge)
     LaunchedEffect(playback?.token) {
         val cmd = playback ?: return@LaunchedEffect
-        val targetMs = (cmd.seekSec * 1000).toLong().coerceAtLeast(0L)
-        player.seekTo(targetMs)
-        lastEmittedSec = cmd.seekSec
-        onPlayheadChange(cmd.seekSec)
+        if (cmd.seekSec != null) {
+            val targetMs = (cmd.seekSec * 1000).toLong().coerceAtLeast(0L)
+            player.seekTo(targetMs)
+            lastEmittedSec = cmd.seekSec
+            onPlayheadChange(cmd.seekSec)
+        }
         playUntilSec = cmd.playUntilSec ?: Double.POSITIVE_INFINITY
         player.playWhenReady = cmd.autoPlay
-        if (cmd.autoPlay) player.play()
+        if (cmd.autoPlay) {
+            if (!player.isPlaying) player.play()
+        } else {
+            if (player.isPlaying) player.pause()
+        }
         onPlaybackConsumed()
     }
 
@@ -207,7 +215,10 @@ fun LocalVideoPlayer(
                 if (player.isPlaying) {
                     if (loopRally && selectedRally != null) {
                         if (sec >= selectedRally.endSec - 0.04) {
-                            player.seekTo((selectedRally.startSec * 1000).toLong())
+                            val loopStartMs = (selectedRally.startSec * 1000).toLong()
+                            player.seekTo(loopStartMs)
+                            lastEmittedSec = selectedRally.startSec
+                            onPlayheadChange(selectedRally.startSec)
                         }
                     } else if (smartSkip && rallies.isNotEmpty()) {
                         val sorted = rallies.sortedBy { it.startSec }
@@ -220,12 +231,12 @@ fun LocalVideoPlayer(
                                 player.pause()
                             }
                         }
-                    }
-
-                    val effectiveEnd = if (playUntilSec.isFinite()) playUntilSec else Double.POSITIVE_INFINITY
-                    if (sec >= effectiveEnd - 0.04) {
-                        player.pause()
-                        playUntilSec = Double.POSITIVE_INFINITY
+                    } else {
+                        val effectiveEnd = if (playUntilSec.isFinite()) playUntilSec else Double.POSITIVE_INFINITY
+                        if (sec >= effectiveEnd - 0.04) {
+                            player.pause()
+                            playUntilSec = Double.POSITIVE_INFINITY
+                        }
                     }
                 }
             }
@@ -432,6 +443,23 @@ fun LocalVideoPlayer(
                                     fontWeight = FontWeight.Medium,
                                 )
                             }
+                        }
+
+                        // Smart Skip toggle
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (smartSkip) Amber.copy(alpha = 0.25f) else Color(0x55000000))
+                                .border(1.dp, if (smartSkip) Amber else Color(0x33FFFFFF), RoundedCornerShape(12.dp))
+                                .pointerInput(Unit) { detectTapGestures { onToggleSmartSkip() } }
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
+                        ) {
+                            Text(
+                                "跳死球",
+                                color = if (smartSkip) Amber else Color(0xCCFFFFFF),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                            )
                         }
 
                         // Speed toggle

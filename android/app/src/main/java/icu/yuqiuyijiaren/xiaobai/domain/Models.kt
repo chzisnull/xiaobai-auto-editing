@@ -86,7 +86,7 @@ data class AnalysisProgress(
 /** One-shot playback instruction for the video player. */
 data class PlaybackCommand(
     val token: Long,
-    val seekSec: Double,
+    val seekSec: Double? = null,
     val playUntilSec: Double? = null,
     val autoPlay: Boolean = false,
 )
@@ -128,6 +128,8 @@ sealed interface EditorEvent {
     data object ClearError : EditorEvent
     data object ClearExportPath : EditorEvent
     data object ClearPlaybackCommand : EditorEvent
+    data class SetIsPlaying(val isPlaying: Boolean) : EditorEvent
+    data object PausePlayback : EditorEvent
 }
 
 data class EditorUiState(
@@ -135,6 +137,7 @@ data class EditorUiState(
     val rallies: List<Rally> = emptyList(),
     val selectedRallyIndex: Int? = null,
     val playheadSec: Double = 0.0,
+    val isPlaying: Boolean = false,
     val analysis: AnalysisProgress = AnalysisProgress(),
     val isExporting: Boolean = false,
     val exportPath: String? = null,

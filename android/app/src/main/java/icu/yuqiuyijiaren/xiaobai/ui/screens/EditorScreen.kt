@@ -36,17 +36,18 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CallMerge
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -497,6 +498,7 @@ private fun VideoPlayerSection(
                 source = state.source,
                 playheadSec = state.playheadSec,
                 onPlayheadChange = viewModel::updatePlayhead,
+                onIsPlayingChange = { viewModel.onEvent(EditorEvent.SetIsPlaying(it)) },
                 playback = state.playback,
                 onPlaybackConsumed = { viewModel.onEvent(EditorEvent.ClearPlaybackCommand) },
                 rallies = state.rallies,
@@ -952,17 +954,29 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                         viewModel.onEvent(EditorEvent.NudgeSelectedEdge(startDelta = 0.5))
                     }
 
-                    // Play this rally
+                    // Play / Pause this rally
+                    val isPlaying = state.isPlaying
                     Button(
-                        onClick = { viewModel.onEvent(EditorEvent.PlaySelected) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Green),
+                        onClick = {
+                            if (isPlaying) {
+                                viewModel.onEvent(EditorEvent.PausePlayback)
+                            } else {
+                                viewModel.onEvent(EditorEvent.PlaySelected)
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = if (isPlaying) Amber else Green),
                         shape = RoundedCornerShape(8.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                         modifier = Modifier.height(34.dp),
                     ) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "暂停" else "播放",
+                            tint = Color.Black,
+                            modifier = Modifier.size(16.dp),
+                        )
                         Spacer(Modifier.width(2.dp))
-                        Text("播放", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text(if (isPlaying) "暂停" else "播放", color = Color.Black, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
 
                     // Nudge End (Dynamically extends playback if currently playing!)
@@ -1058,7 +1072,7 @@ private fun StickyThumbActionZone(
 
             // 4. 合并
             ThumbActionButton(
-                icon = Icons.Default.CallMerge,
+                icon = Icons.AutoMirrored.Filled.CallMerge,
                 label = "合并",
                 enabled = canMergeNext,
                 onClick = { viewModel.onEvent(EditorEvent.MergeSelectedWithNext) },
@@ -1066,7 +1080,7 @@ private fun StickyThumbActionZone(
 
             // 5. 回合表
             ThumbActionButton(
-                icon = Icons.Default.FormatListBulleted,
+                icon = Icons.AutoMirrored.Filled.FormatListBulleted,
                 label = "回合表",
                 badge = if (state.rallies.isNotEmpty()) "${state.rallies.size}" else null,
                 onClick = onOpenRalliesSheet,
