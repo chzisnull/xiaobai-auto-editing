@@ -19,6 +19,7 @@ import icu.yuqiuyijiaren.xiaobai.domain.EditorUiState
 import icu.yuqiuyijiaren.xiaobai.domain.PlaybackCommand
 import icu.yuqiuyijiaren.xiaobai.domain.Rally
 import icu.yuqiuyijiaren.xiaobai.domain.ReviewStatus
+import icu.yuqiuyijiaren.xiaobai.domain.mergeOverlapping
 import icu.yuqiuyijiaren.xiaobai.export.GallerySaver
 import icu.yuqiuyijiaren.xiaobai.export.LocalExporter
 import kotlinx.coroutines.Job
@@ -123,6 +124,10 @@ class EditorViewModel(
             EditorEvent.ClearPlaybackCommand -> _uiState.update { it.copy(playback = null) }
             is EditorEvent.SetIsPlaying -> _uiState.update { it.copy(isPlaying = event.isPlaying) }
             EditorEvent.PausePlayback -> pausePlayback()
+            EditorEvent.TogglePlayPause -> togglePlayPause()
+            is EditorEvent.FastForward -> fastForward(event.deltaSec)
+            EditorEvent.StartDirectEdit -> startDirectEdit()
+            EditorEvent.ClearAllRallies -> clearAllRallies()
         }
     }
 
@@ -315,9 +320,13 @@ class EditorViewModel(
             endSec = end,
             confidence = 1.0,
         )
-        _uiState.update {
-            val next = (it.rallies + rally).sortedBy { r -> r.startSec }
-            it.copy(rallies = next, selectedRallyIndex = next.indexOfFirst { r -> r.id == rally.id })
+        _uiState.update { state ->
+            val merged = (state.rallies + rally).mergeOverlapping()
+            state.copy(
+                rallies = merged,
+                selectedRallyIndex = merged.indexOfFirst { r -> r.id == rally.id || start in r.startSec..r.endSec }
+                    .takeIf { it >= 0 } ?: merged.indices.firstOrNull(),
+            )
         }
     }
 
@@ -345,9 +354,12 @@ class EditorViewModel(
 
     private fun splitSelectedAtPlayhead() {
         val duration = _uiState.value.source?.durationSec ?: return
-        val index = _uiState.value.selectedRallyIndex ?: return
-        val rally = _uiState.value.rallies.getOrNull(index) ?: return
         val cut = _uiState.value.playheadSec
+        val rallies = _uiState.value.rallies
+        val index = _uiState.value.selectedRallyIndex
+            ?: rallies.indexOfFirst { cut in it.startSec..it.endSec }.takeIf { it >= 0 }
+            ?: return
+        val rally = rallies.getOrNull(index) ?: return
         if (cut <= rally.startSec + 0.3 || cut >= rally.endSec - 0.3) return
         pushUndo()
         _uiState.update { state ->
@@ -464,8 +476,14 @@ class EditorViewModel(
                 nextPlayback = null
             }
 
+            val merged = next.mergeOverlapping()
+            val newIdx = merged.indexOfFirst {
+                (updatedRally.startSec in it.startSec..it.endSec) || (it.startSec in updatedRally.startSec..updatedRally.endSec)
+            }.takeIf { it >= 0 } ?: index.coerceIn(0, merged.lastIndex)
+
             state.copy(
-                rallies = next,
+                rallies = merged,
+                selectedRallyIndex = newIdx,
                 playheadSec = nextPlayhead,
                 playback = nextPlayback,
             )
@@ -543,20 +561,23 @@ class EditorViewModel(
     private fun markRangeStart() {
         val t = _uiState.value.playheadSec
         val out = _uiState.value.rangeMarkOutSec
-        if (out != null && out > t + 0.3) {
+        if (out != null && kotlin.math.abs(out - t) >= 0.3) {
+            val start = minOf(t, out)
+            val end = maxOf(t, out)
             val duration = _uiState.value.source?.durationSec ?: return
             pushUndo()
             val rally = Rally(
                 id = System.currentTimeMillis(),
-                startSec = t,
-                endSec = out,
+                startSec = start,
+                endSec = end,
                 confidence = 1.0,
             ).clamp(duration)
             _uiState.update { state ->
-                val next = (state.rallies + rally).sortedBy { it.startSec }
+                val merged = (state.rallies + rally).mergeOverlapping()
                 state.copy(
-                    rallies = next,
-                    selectedRallyIndex = next.indexOfFirst { it.id == rally.id },
+                    rallies = merged,
+                    selectedRallyIndex = merged.indexOfFirst { (start in it.startSec..it.endSec) || (it.startSec in start..end) }
+                        .takeIf { it >= 0 } ?: merged.indices.firstOrNull(),
                     rangeMarkInSec = null,
                     rangeMarkOutSec = null,
                 )
@@ -567,29 +588,48 @@ class EditorViewModel(
     }
 
     private fun markRangeEnd() {
+        val duration = _uiState.value.source?.durationSec ?: return
         val t = _uiState.value.playheadSec
         val markIn = _uiState.value.rangeMarkInSec
-        if (markIn == null) {
-            _uiState.update { it.copy(rangeMarkOutSec = t) }
-            return
+        val selected = _uiState.value.selectedRally
+
+        val start: Double
+        val end: Double
+
+        if (markIn != null) {
+            start = minOf(markIn, t)
+            end = maxOf(markIn, t)
+        } else if (selected != null && t > selected.startSec) {
+            start = selected.startSec
+            end = t
+        } else {
+            start = maxOf(0.0, t - 4.0)
+            end = t
         }
-        if (t <= markIn + 0.3) {
-            _uiState.update { it.copy(errorMessage = "出点需晚于入点至少 0.3 秒") }
-            return
-        }
-        val duration = _uiState.value.source?.durationSec ?: return
+
+        val safeEnd = if (end - start < 0.3) (start + 0.5).coerceAtMost(duration) else end
         pushUndo()
         val rally = Rally(
             id = System.currentTimeMillis(),
-            startSec = markIn,
-            endSec = t,
+            startSec = start,
+            endSec = safeEnd,
             confidence = 1.0,
         ).clamp(duration)
+
         _uiState.update { state ->
-            val next = (state.rallies + rally).sortedBy { it.startSec }
+            val combined = if (markIn == null && selected != null && t > selected.startSec) {
+                state.rallies.filter { it.id != selected.id } + rally
+            } else {
+                state.rallies + rally
+            }
+            val merged = combined.mergeOverlapping()
+            val newIdx = merged.indexOfFirst {
+                (start in it.startSec..it.endSec) || (it.startSec in start..safeEnd)
+            }.takeIf { it >= 0 } ?: merged.indices.firstOrNull()
+
             state.copy(
-                rallies = next,
-                selectedRallyIndex = next.indexOfFirst { it.id == rally.id },
+                rallies = merged,
+                selectedRallyIndex = newIdx,
                 rangeMarkInSec = null,
                 rangeMarkOutSec = null,
             )
@@ -606,6 +646,80 @@ class EditorViewModel(
                     seekSec = null,
                     autoPlay = false,
                 ),
+            )
+        }
+    }
+
+    private fun togglePlayPause() {
+        val isCurrentlyPlaying = _uiState.value.isPlaying
+        if (isCurrentlyPlaying) {
+            pausePlayback()
+        } else {
+            playbackToken += 1L
+            _uiState.update {
+                it.copy(
+                    isPlaying = true,
+                    playback = PlaybackCommand(
+                        token = playbackToken,
+                        seekSec = null,
+                        autoPlay = true,
+                    ),
+                )
+            }
+        }
+    }
+
+    private fun fastForward(deltaSec: Double) {
+        val duration = _uiState.value.source?.durationSec ?: return
+        val currentPlayhead = _uiState.value.playheadSec
+        val targetSec = (currentPlayhead + deltaSec).coerceIn(0.0, duration)
+        val isPlaying = _uiState.value.isPlaying
+
+        playbackToken += 1L
+        _uiState.update { state ->
+            state.copy(
+                playheadSec = targetSec,
+                playback = PlaybackCommand(
+                    token = playbackToken,
+                    seekSec = targetSec,
+                    playUntilSec = if (isPlaying && state.playback?.playUntilSec != null && targetSec < state.playback.playUntilSec) {
+                        state.playback.playUntilSec
+                    } else null,
+                    autoPlay = isPlaying,
+                ),
+            )
+        }
+    }
+
+    private fun startDirectEdit() {
+        val duration = _uiState.value.source?.durationSec ?: return
+        if (duration <= 0.0) return
+        pushUndo()
+        val fullRally = Rally(
+            id = System.currentTimeMillis(),
+            startSec = 0.0,
+            endSec = duration,
+            confidence = 1.0,
+        )
+        _uiState.update { state ->
+            state.copy(
+                rallies = listOf(fullRally),
+                selectedRallyIndex = 0,
+                rangeMarkInSec = null,
+                rangeMarkOutSec = null,
+            )
+        }
+    }
+
+    private fun clearAllRallies() {
+        if (_uiState.value.rallies.isEmpty()) return
+        pushUndo()
+        _uiState.update {
+            it.copy(
+                rallies = emptyList(),
+                selectedRallyIndex = null,
+                rangeMarkInSec = null,
+                rangeMarkOutSec = null,
             )
         }
     }

@@ -36,15 +36,17 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.CallMerge
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.IosShare
 import androidx.compose.material.icons.filled.Pause
@@ -580,7 +582,7 @@ private fun StatusAndAnalysisBanner(state: EditorUiState, viewModel: EditorViewM
             }
         }
     } else if (state.source != null && state.rallies.isEmpty()) {
-        // AI Analysis Call to Action
+        // Direct Edit & AI Analysis Call to Action
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -594,33 +596,66 @@ private fun StatusAndAnalysisBanner(state: EditorUiState, viewModel: EditorViewM
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Column {
-                    Text("智能回合识别", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                    Text("击球声纹 + 场地落点自适应检测", color = Muted, fontSize = 11.sp)
+                Column(modifier = Modifier.weight(1f, fill = false)) {
+                    Text("准备剪辑", color = Ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Text("免识别直接剪辑，或用 AI 智能识别", color = Muted, fontSize = 11.sp)
                 }
 
-                Button(
-                    onClick = { viewModel.onEvent(EditorEvent.StartAnalysis) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Blue),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                ) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text("开始识别", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.width(8.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // 直接剪辑按钮 (无需识别)
+                    OutlinedButton(
+                        onClick = { viewModel.onEvent(EditorEvent.StartDirectEdit) },
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Icon(Icons.Default.ContentCut, contentDescription = null, tint = Ink, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("直接剪辑", color = Ink, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    // 智能识别按钮
+                    Button(
+                        onClick = { viewModel.onEvent(EditorEvent.StartAnalysis) },
+                        colors = ButtonDefaults.buttonColors(containerColor = Blue),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("智能识别", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
     } else if (state.rallies.isNotEmpty()) {
-        // 4 Compact Metric Chips
+        // Metric Chips + AI Option
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             MetricPill("原片", formatClock(state.source?.durationSec ?: 0.0), modifier = Modifier.weight(1f))
             MetricPill("成片", formatClock(state.selectedDurationSec), highlight = Green, modifier = Modifier.weight(1f))
             MetricPill("精简", "-${state.reductionPercent}%", highlight = Amber, modifier = Modifier.weight(1f))
             MetricPill("回合", "${state.rallies.size}段", modifier = Modifier.weight(1f))
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(Color(0x1F007AFF))
+                    .border(1.dp, Color(0x44007AFF), RoundedCornerShape(10.dp))
+                    .clickable { viewModel.onEvent(EditorEvent.StartAnalysis) }
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Blue, modifier = Modifier.size(13.dp))
+                    Spacer(Modifier.width(2.dp))
+                    Text("AI识别", color = Blue, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
@@ -1001,6 +1036,153 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                     }
                 }
             }
+        } else if (state.rangeMarkInSec != null) {
+            // Active marking zone
+            val markIn = state.rangeMarkInSec
+            val currentLen = (state.playheadSec - markIn).coerceAtLeast(0.0)
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF34C759)),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = "正在标记回合: 起点 %s · 长度 %.1fs".format(formatClock(markIn), currentLen),
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                    Text(
+                        text = "取消标记",
+                        color = Red,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { viewModel.onEvent(EditorEvent.ClearRangeMarks) }
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    // Play/Pause
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0x22FFFFFF))
+                            .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                            .clickable { viewModel.onEvent(EditorEvent.TogglePlayPause) }
+                            .padding(vertical = 9.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            if (state.isPlaying) "暂停" else "播放",
+                            color = Ink,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+
+                    // Fast Forward +1.5s
+                    Box(
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0x2E34C759))
+                            .border(1.dp, Color(0xFF34C759), RoundedCornerShape(8.dp))
+                            .clickable { viewModel.onEvent(EditorEvent.FastForward(1.5)) }
+                            .padding(vertical = 9.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.FastForward,
+                                contentDescription = null,
+                                tint = Color(0xFF34C759),
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                "快进 1.5s",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+
+                    // Mark End
+                    Box(
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF34C759))
+                            .clickable { viewModel.onEvent(EditorEvent.MarkRangeEndAtPlayhead) }
+                            .padding(vertical = 9.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = Color.Black,
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                "标结束",
+                                color = Color.Black,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (state.source != null && state.rallies.isEmpty()) {
+            // Direct editing entry point when empty
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "尚未划分回合，可导入整片直接剪辑，或用下方按钮标记",
+                    color = Muted,
+                    fontSize = 12.sp,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0x22FFFFFF))
+                        .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                        .clickable { viewModel.onEvent(EditorEvent.StartDirectEdit) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.ContentCut, contentDescription = null, tint = Ink, modifier = Modifier.size(14.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("全片直接剪", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         } else {
             // Hint when no rally is selected
             Row(
@@ -1011,7 +1193,7 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = if (state.rallies.isEmpty()) "点击识别或下方「+回合」添加对战片段" else "轻触时间轴上的绿色回合块进行精准剪辑",
+                    text = "轻触时间轴上的绿色回合块进行精准剪辑",
                     color = Muted,
                     fontSize = 12.sp,
                 )
@@ -1022,7 +1204,7 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
 
 /**
  * Sticky Bottom Thumb Action Zone (CapCut Style):
- * 6 thumb-friendly icons for high frequency mobile operation.
+ * Thumb-friendly icons for high frequency mobile operation.
  */
 @Composable
 private fun StickyThumbActionZone(
@@ -1031,51 +1213,139 @@ private fun StickyThumbActionZone(
     onOpenRalliesSheet: () -> Unit,
 ) {
     val selectedIndex = state.selectedRallyIndex
-    val canMergeNext = selectedIndex != null && selectedIndex < state.rallies.lastIndex
+    val currentRallyAtPlayhead = state.rallies.firstOrNull { state.playheadSec in it.startSec..it.endSec }
+    val canSplit = state.source != null && (selectedIndex != null || currentRallyAtPlayhead != null)
+    val canDelete = selectedIndex != null || currentRallyAtPlayhead != null
 
-    Box(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(SurfaceGlass)
-            .border(1.dp, BorderSubtle, RoundedCornerShape(0.dp))
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .border(1.dp, BorderSubtle, RoundedCornerShape(0.dp)),
     ) {
+        if (state.rangeMarkInSec != null) {
+            val markIn = state.rangeMarkInSec
+            val currentLen = (state.playheadSec - markIn).coerceAtLeast(0.0)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0x2E34C759))
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF34C759)),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "已定起点 %s · 长度 %.1fs".format(formatClock(markIn), currentLen),
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0xFF34C759).copy(alpha = 0.25f))
+                            .border(1.dp, Color(0xFF34C759), RoundedCornerShape(4.dp))
+                            .clickable { viewModel.onEvent(EditorEvent.FastForward(1.5)) }
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.FastForward,
+                                contentDescription = null,
+                                tint = Color(0xFF34C759),
+                                modifier = Modifier.size(12.dp),
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                "快进 1.5s",
+                                color = Color.White,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "取消",
+                        color = Red,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { viewModel.onEvent(EditorEvent.ClearRangeMarks) }
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
+            }
+        }
+
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 1. +回合
+            // 1. 标开始 (常驻按钮)
             ThumbActionButton(
-                icon = Icons.Default.Add,
-                label = "+回合",
+                icon = Icons.Default.Flag,
+                label = if (state.rangeMarkInSec != null) "已标起点" else "标开始",
+                tint = if (state.rangeMarkInSec != null) Color(0xFF34C759) else Blue,
+                badge = if (state.rangeMarkInSec != null) "●" else null,
                 enabled = state.source != null,
-                onClick = { viewModel.onEvent(EditorEvent.AddRallyAt(state.playheadSec)) },
+                onClick = { viewModel.onEvent(EditorEvent.MarkRangeStartAtPlayhead) },
             )
 
-            // 2. 拆分
+            // 2. 快进 1.5s (常驻按钮)
+            ThumbActionButton(
+                icon = Icons.Default.FastForward,
+                label = "+1.5s",
+                tint = if (state.rangeMarkInSec != null) Color(0xFF34C759) else Ink,
+                enabled = state.source != null,
+                onClick = { viewModel.onEvent(EditorEvent.FastForward(1.5)) },
+            )
+
+            // 3. 标结束 (常驻按钮)
+            ThumbActionButton(
+                icon = Icons.Default.CheckCircle,
+                label = "标结束",
+                tint = if (state.rangeMarkInSec != null) Color(0xFF34C759) else Ink,
+                enabled = state.source != null,
+                onClick = { viewModel.onEvent(EditorEvent.MarkRangeEndAtPlayhead) },
+            )
+
+            // 4. 拆分
             ThumbActionButton(
                 icon = Icons.Default.ContentCut,
                 label = "拆分",
-                enabled = selectedIndex != null,
+                enabled = canSplit,
                 onClick = { viewModel.onEvent(EditorEvent.SplitSelectedAtPlayhead) },
             )
 
-            // 3. 删除
+            // 5. 删除
             ThumbActionButton(
                 icon = Icons.Default.Delete,
                 label = "删除",
-                tint = if (selectedIndex != null) Red else Muted,
-                enabled = selectedIndex != null,
-                onClick = { selectedIndex?.let { viewModel.onEvent(EditorEvent.DeleteRally(it)) } },
-            )
-
-            // 4. 合并
-            ThumbActionButton(
-                icon = Icons.AutoMirrored.Filled.CallMerge,
-                label = "合并",
-                enabled = canMergeNext,
-                onClick = { viewModel.onEvent(EditorEvent.MergeSelectedWithNext) },
+                tint = if (canDelete) Red else Muted,
+                enabled = canDelete,
+                onClick = {
+                    val idx = selectedIndex ?: state.rallies.indexOfFirst { state.playheadSec in it.startSec..it.endSec }.takeIf { it >= 0 }
+                    idx?.let { viewModel.onEvent(EditorEvent.DeleteRally(it)) }
+                },
             )
 
             // 5. 回合表
@@ -1138,7 +1408,19 @@ private fun RalliesBottomSheetContent(
                 fontWeight = FontWeight.Bold,
             )
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (state.rallies.isNotEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0x1FFF3B30))
+                            .clickable { viewModel.onEvent(EditorEvent.ClearAllRallies) }
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Text("清空", color = Red, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    }
+                }
+
                 if (state.rallies.size >= 2) {
                     Box(
                         modifier = Modifier
@@ -1166,7 +1448,28 @@ private fun RalliesBottomSheetContent(
                     .height(180.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                Text("暂无回合，请点击「智能识别」或「+回合」添加", color = Muted, fontSize = 13.sp)
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("暂无回合片段", color = Muted, fontSize = 13.sp)
+                    if (state.source != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Blue.copy(alpha = 0.2f))
+                                .border(1.dp, Blue, RoundedCornerShape(8.dp))
+                                .clickable {
+                                    viewModel.onEvent(EditorEvent.StartDirectEdit)
+                                    onClose()
+                                }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.ContentCut, contentDescription = null, tint = Blue, modifier = Modifier.size(14.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("导入全片直接剪辑", color = Blue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
             }
         } else {
             LazyColumn(
@@ -1324,7 +1627,7 @@ private fun ThumbActionButton(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable(enabled = enabled) { onClick() }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 5.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(

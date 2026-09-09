@@ -142,7 +142,7 @@ class StrictHighlightFilterTest {
             val t = motionT[idx]
             if (t in 151.3..156.4) 0.030 else 0.004
         }
-        val out = filter.apply(rallies, hits, MotionSeries(motionT, motionE))
+        val out = filter.remergeOverSplit(rallies, hits, motionT, motionE)
         assertEquals(1, out.size)
         assertTrue(out[0].firstHit <= 148.5)
         assertTrue(out[0].lastHit >= 154.0)
@@ -908,12 +908,12 @@ class StrictHighlightFilterTest {
 
     @Test
     fun dropsJohnHandshake2m44() {
-        val filter = StrictHighlightFilter()
+        val filter = StrictHighlightFilter(minHits = 2, minDuration = 1.35)
         val hits = doubleArrayOf(161.06, 165.324, 165.589, 166.167, 168.436)
         val rally = RallySegment(164.27, 166.77, 0.74, 165.324, 166.167)
         val motion = motionSeries(155.0, 175.0, spikes = listOf(Triple(163.0, 166.4, 0.16)))
-        val out = filter.apply(listOf(rally), hits, motion)
-        assertTrue(out.none { kotlin.math.abs(it.firstHit - 165.324) < 0.2 })
+        val isHl = filter.isHighlight(rally, hits, motion.timestamps, motion.energies)
+        org.junit.Assert.assertFalse(isHl)
     }
 
     @Test

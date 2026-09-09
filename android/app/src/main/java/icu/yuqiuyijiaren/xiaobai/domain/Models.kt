@@ -30,6 +30,40 @@ data class Rally(
     }
 }
 
+/**
+ * Automatically merges overlapping or touching rallies into single continuous rallies.
+ */
+fun List<Rally>.mergeOverlapping(marginSec: Double = 0.05): List<Rally> {
+    if (size <= 1) return this
+    val sorted = sortedBy { it.startSec }
+    val result = ArrayList<Rally>(sorted.size)
+    var current = sorted[0]
+
+    for (i in 1 until sorted.size) {
+        val next = sorted[i]
+        if (next.startSec <= current.endSec + marginSec) {
+            val mergedEnd = maxOf(current.endSec, next.endSec)
+            val mergedConfidence = maxOf(current.confidence, next.confidence)
+            val mergedStatus = when {
+                current.reviewStatus == ReviewStatus.Approved || next.reviewStatus == ReviewStatus.Approved -> ReviewStatus.Approved
+                current.reviewStatus == ReviewStatus.Flagged || next.reviewStatus == ReviewStatus.Flagged -> ReviewStatus.Flagged
+                current.reviewStatus == ReviewStatus.Rejected && next.reviewStatus == ReviewStatus.Rejected -> ReviewStatus.Rejected
+                else -> current.reviewStatus
+            }
+            current = current.copy(
+                endSec = mergedEnd,
+                confidence = mergedConfidence,
+                reviewStatus = mergedStatus,
+            )
+        } else {
+            result.add(current)
+            current = next
+        }
+    }
+    result.add(current)
+    return result
+}
+
 data class VideoSource(
     val uriString: String,
     val displayName: String,
@@ -130,6 +164,10 @@ sealed interface EditorEvent {
     data object ClearPlaybackCommand : EditorEvent
     data class SetIsPlaying(val isPlaying: Boolean) : EditorEvent
     data object PausePlayback : EditorEvent
+    data object TogglePlayPause : EditorEvent
+    data class FastForward(val deltaSec: Double = 1.5) : EditorEvent
+    data object StartDirectEdit : EditorEvent
+    data object ClearAllRallies : EditorEvent
 }
 
 data class EditorUiState(

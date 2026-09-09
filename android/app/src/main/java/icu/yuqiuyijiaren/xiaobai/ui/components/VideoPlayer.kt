@@ -551,7 +551,7 @@ fun LocalVideoPlayer(
                             )
                         }
 
-                        // Frame stepping buttons
+                        // Frame stepping & Fast Forward buttons
                         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             Box(
                                 modifier = Modifier
@@ -570,6 +570,16 @@ fun LocalVideoPlayer(
                                     .padding(horizontal = 7.dp, vertical = 3.dp),
                             ) {
                                 Text("+1帧", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0x3834C759))
+                                    .border(1.dp, Color(0xFF34C759), RoundedCornerShape(6.dp))
+                                    .pointerInput(Unit) { detectTapGestures { seekRelative(1.5) } }
+                                    .padding(horizontal = 7.dp, vertical = 3.dp),
+                            ) {
+                                Text("+1.5s", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

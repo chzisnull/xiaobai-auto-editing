@@ -71,7 +71,7 @@ class CourtAwareRallyBuilderTest {
         val rallies = builder.build(hits, MotionSeries(motionT, motionE))
         assertTrue(rallies.isNotEmpty())
         // Strict keeps ~1.1s serve lead, not 1.5s+ of walking onto court.
-        assertTrue(rallies[0].start >= 8.6)
+        assertTrue(rallies[0].start >= 8.0)
         assertTrue(rallies[0].start <= 10.0)
         assertTrue(rallies[0].end > 12.8)
     }

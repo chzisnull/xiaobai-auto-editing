@@ -767,7 +767,7 @@ class StrictHighlightFilter(
         return result
     }
 
-    private fun remergeOverSplit(
+    internal fun remergeOverSplit(
         rallies: List<RallySegment>,
         hits: DoubleArray,
         motionT: DoubleArray,
@@ -921,7 +921,7 @@ class StrictHighlightFilter(
         return inside.size >= 4 && rally.lastHit <= 5.5
     }
 
-    private fun isHighlight(
+    internal fun isHighlight(
         rally: RallySegment,
         hits: DoubleArray,
         motionT: DoubleArray,

@@ -78,7 +78,6 @@ fun ZoomableRallyTimeline(
     var zoom by remember { mutableFloatStateOf(2.2f) }
     val scroll = rememberScrollState()
     val density = LocalDensity.current
-    var dragMode by remember { mutableStateOf<DragMode?>(null) }
 
     BoxWithConstraints(
         modifier = modifier
@@ -97,20 +96,12 @@ fun ZoomableRallyTimeline(
         val canvasWidth = viewportWidth * zoom
         val canvasWidthPx = with(density) { canvasWidth.toPx() }
         val minBlockPx = with(density) { 40.dp.toPx() }
-        val handlePx = with(density) { 36.dp.toPx() }
-        val snapPx = with(density) { 10.dp.toPx() }
 
         fun timeToX(time: Double, widthPx: Float): Float =
             ((time / durationSec).toFloat().coerceIn(0f, 1f) * widthPx)
 
         fun xToTime(x: Float, widthPx: Float): Double =
             (x / widthPx).coerceIn(0f, 1f) * durationSec
-
-        fun snapTime(time: Double, widthPx: Float): Double {
-            val playX = timeToX(playheadSec, widthPx)
-            val tX = timeToX(time, widthPx)
-            return if (abs(playX - tX) <= snapPx) playheadSec else time
-        }
 
         LaunchedEffect(playheadSec, zoom, durationSec) {
             val x = ((playheadSec / durationSec).toFloat() * canvasWidthPx)
@@ -127,93 +118,34 @@ fun ZoomableRallyTimeline(
                 .width(canvasWidth)
                 .fillMaxHeight()
                 .padding(horizontal = 12.dp, vertical = 8.dp)
-                .pointerInput(durationSec, canvasWidth, dragMode) {
+                .pointerInput(durationSec, canvasWidth) {
                     detectTapGestures(
                         onDoubleTap = { zoom = 2.2f },
                         onTap = { offset ->
-                            if (dragMode != null) return@detectTapGestures
-                            // Prefer selecting a rally under tap
                             val time = xToTime(offset.x, size.width.toFloat())
                             val hit = rallies.indexOfLast { time in it.startSec..it.endSec }
                             if (hit >= 0) {
                                 onSelect(hit)
-                                onSeek(time)
-                            } else {
-                                onSeek(time)
                             }
+                            onSeek(time)
                         },
                     )
                 }
-                .pointerInput(durationSec, canvasWidth, selectedIndex, rallies) {
+                .pointerInput(durationSec, canvasWidth) {
                     detectDragGestures(
                         onDragStart = { offset ->
                             onGestureStart()
-                            val idx = selectedIndex?.takeIf { it in rallies.indices }
-                            val selected = idx?.let { rallies[it] }
-                            dragMode = if (selected != null && idx != null) {
-                                val startX = timeToX(selected.startSec, size.width.toFloat())
-                                val endX = timeToX(selected.endSec, size.width.toFloat())
-                                when {
-                                    abs(offset.x - startX) <= handlePx ->
-                                        DragMode.TrimStart(idx)
-                                    abs(offset.x - endX) <= handlePx ->
-                                        DragMode.TrimEnd(idx)
-                                    offset.x in startX..endX ->
-                                        DragMode.MoveBody(
-                                            index = idx,
-                                            grabTime = xToTime(offset.x, size.width.toFloat()),
-                                            originStart = selected.startSec,
-                                            originEnd = selected.endSec,
-                                        )
-                                    else -> DragMode.Scrub
-                                }
-                            } else {
-                                DragMode.Scrub
-                            }
+                            val widthPx = size.width.toFloat()
+                            val time = xToTime(offset.x, widthPx)
+                            onSeek(time)
                         },
-                        onDragEnd = {
-                            dragMode = null
-                            onGestureEnd()
-                        },
-                        onDragCancel = {
-                            dragMode = null
-                            onGestureEnd()
-                        },
+                        onDragEnd = { onGestureEnd() },
+                        onDragCancel = { onGestureEnd() },
                         onDrag = { change, _ ->
                             change.consume()
                             val widthPx = size.width.toFloat()
                             val time = xToTime(change.position.x, widthPx)
-                            when (val mode = dragMode) {
-                                is DragMode.Scrub, null -> onSeek(time)
-                                is DragMode.TrimStart -> {
-                                    val rally = rallies.getOrNull(mode.index) ?: return@detectDragGestures
-                                    val start = snapTime(time, widthPx).coerceIn(0.0, rally.endSec - 0.25)
-                                    onUpdateRally(mode.index, start, rally.endSec)
-                                    onSeek(start)
-                                }
-                                is DragMode.TrimEnd -> {
-                                    val rally = rallies.getOrNull(mode.index) ?: return@detectDragGestures
-                                    val end = snapTime(time, widthPx).coerceIn(rally.startSec + 0.25, durationSec)
-                                    onUpdateRally(mode.index, rally.startSec, end)
-                                    onSeek(end)
-                                }
-                                is DragMode.MoveBody -> {
-                                    val delta = time - mode.grabTime
-                                    val len = mode.originEnd - mode.originStart
-                                    var start = mode.originStart + delta
-                                    var end = mode.originEnd + delta
-                                    if (start < 0.0) {
-                                        start = 0.0
-                                        end = len
-                                    }
-                                    if (end > durationSec) {
-                                        end = durationSec
-                                        start = (durationSec - len).coerceAtLeast(0.0)
-                                    }
-                                    onUpdateRally(mode.index, start, end)
-                                    onSeek(start)
-                                }
-                            }
+                            onSeek(time)
                         },
                     )
                 },
@@ -254,18 +186,37 @@ fun ZoomableRallyTimeline(
                         .background(Color(0xFFFF3B30)),
                 )
             }
-            if (markIn != null && markOut != null && markOut > markIn) {
-                val startRatio = (markIn / durationSec).toFloat()
-                val widthRatio = ((markOut - markIn) / durationSec).toFloat()
+            if (markIn != null && markOut != null && markOut > markIn && durationSec > 0.0) {
+                val startRatio = (markIn / durationSec).toFloat().coerceIn(0f, 1f)
+                val widthRatio = ((markOut - markIn) / durationSec).toFloat().coerceIn(0f, 1f)
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
-                        .padding(top = 12.dp)
+                        .padding(top = 10.dp)
                         .offset(x = canvasWidth * startRatio)
                         .width(canvasWidth * widthRatio)
-                        .height(if (compact) 36.dp else 44.dp)
+                        .height(if (compact) 36.dp else 48.dp)
+                        .clip(RoundedCornerShape(8.dp))
                         .background(Color(0x3334C759)),
                 )
+            } else if (markIn != null && markOut == null && durationSec > 0.0) {
+                val from = minOf(markIn, playheadSec)
+                val to = maxOf(markIn, playheadSec)
+                val startRatio = (from / durationSec).toFloat().coerceIn(0f, 1f)
+                val widthRatio = ((to - from) / durationSec).toFloat().coerceIn(0f, 1f)
+                if (widthRatio > 0.001f) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(top = 10.dp)
+                            .offset(x = canvasWidth * startRatio)
+                            .width(canvasWidth * widthRatio)
+                            .height(if (compact) 36.dp else 48.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0x3334C759))
+                            .border(1.dp, Color(0xFF34C759), RoundedCornerShape(8.dp)),
+                    )
+                }
             }
 
             rallies.forEachIndexed { index, rally ->
@@ -304,10 +255,6 @@ fun ZoomableRallyTimeline(
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                         modifier = Modifier.align(Alignment.Center),
                     )
-                    if (selected) {
-                        HandleBar(Alignment.CenterStart)
-                        HandleBar(Alignment.CenterEnd)
-                    }
                 }
             }
 
@@ -336,31 +283,6 @@ fun ZoomableRallyTimeline(
             }
         }
     }
-}
-
-@Composable
-private fun androidx.compose.foundation.layout.BoxScope.HandleBar(align: Alignment) {
-    Box(
-        modifier = Modifier
-            .align(align)
-            .fillMaxHeight()
-            .width(12.dp)
-            .padding(vertical = 4.dp, horizontal = 2.dp)
-            .clip(RoundedCornerShape(3.dp))
-            .background(Color.White),
-    )
-}
-
-private sealed interface DragMode {
-    data object Scrub : DragMode
-    data class TrimStart(val index: Int) : DragMode
-    data class TrimEnd(val index: Int) : DragMode
-    data class MoveBody(
-        val index: Int,
-        val grabTime: Double,
-        val originStart: Double,
-        val originEnd: Double,
-    ) : DragMode
 }
 
 private fun adaptiveTicks(durationSec: Double, canvasWidthDp: Float): List<Double> {

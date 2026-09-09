@@ -90,9 +90,9 @@ data class AnalysisConfig(
                     maxAudioMinutes = if (device.totalRamMb < 3072) 12 else 20,
                     motionMaxSamples = 900,
                     doubleHighlightPass = false,
-                    softProminence = 1.06f,
+                    softProminence = 1.02f,
                     applyMotionBlur = false,
-                    hitMadK = 6.2f,
+                    hitMadK = 4.2f,
                 )
                 AnalysisTier.Standard -> AnalysisConfig(
                     tier = effective,
@@ -101,10 +101,10 @@ data class AnalysisConfig(
                     useClosestFrame = false,
                     maxAudioMinutes = if (device.totalRamMb >= 4096) 25 else 18,
                     motionMaxSamples = 1200,
-                    doubleHighlightPass = true,
-                    softProminence = 1.05f,
+                    doubleHighlightPass = false,
+                    softProminence = 1.02f,
                     applyMotionBlur = false,
-                    hitMadK = 6.6f,
+                    hitMadK = 4.2f,
                 )
                 AnalysisTier.Precise -> AnalysisConfig(
                     tier = effective,
@@ -113,10 +113,10 @@ data class AnalysisConfig(
                     useClosestFrame = false,
                     maxAudioMinutes = if (device.totalRamMb >= 6144) 30 else 22,
                     motionMaxSamples = 1800,
-                    doubleHighlightPass = true,
-                    softProminence = 1.04f,
+                    doubleHighlightPass = false,
+                    softProminence = 1.02f,
                     applyMotionBlur = true,
-                    hitMadK = 6.6f,
+                    hitMadK = 4.0f,
                 )
             }
         }

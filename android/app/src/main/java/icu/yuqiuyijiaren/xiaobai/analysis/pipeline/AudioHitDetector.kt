@@ -24,9 +24,9 @@ class AudioHitDetector(
     private val minHitIntervalSec: Double = 0.25,
     /** Hard cap (~20 min @ 16 kHz) to avoid OOM on very long matches. */
     private val maxOutputSamples: Int = 16_000 * 60 * 20,
-    private val softProminence: Float = 1.04f,
+    private val softProminence: Float = 1.02f,
     /** Envelope MAD multiplier. Higher = fewer gym-noise / adjacent-court hits. */
-    private val hitMadK: Float = 6.6f,
+    private val hitMadK: Float = 4.2f,
 ) {
     data class Result(
         val hitsSec: DoubleArray,
