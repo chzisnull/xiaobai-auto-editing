@@ -86,6 +86,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
@@ -318,8 +319,8 @@ private fun PortraitLayout(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         // 1. Video Container
         VideoPlayerSection(
@@ -906,8 +907,8 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
             .padding(horizontal = 10.dp, vertical = 8.dp),
     ) {
         if (rally != null && index != null) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Header of selected rally with direct [◀] [▶] Steppers
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Row 1: Selected rally steppers & index + Playhead quick anchors
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -918,7 +919,7 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                         val canPrev = index > 0
                         Box(
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(26.dp)
                                 .clip(CircleShape)
                                 .background(if (canPrev) Color(0x33FFFFFF) else Color(0x0EFFFFFF))
                                 .clickable(enabled = canPrev) {
@@ -942,7 +943,7 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(Blue.copy(alpha = 0.2f))
                                 .border(1.dp, Blue.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                                .padding(horizontal = 8.dp, vertical = 3.dp),
                         ) {
                             Text(
                                 "第 %02d / %02d 回合".format(index + 1, state.rallies.size),
@@ -958,7 +959,7 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                         val canNext = index < state.rallies.lastIndex
                         Box(
                             modifier = Modifier
-                                .size(24.dp)
+                                .size(26.dp)
                                 .clip(CircleShape)
                                 .background(if (canNext) Color(0x33FFFFFF) else Color(0x0EFFFFFF))
                                 .clickable(enabled = canNext) {
@@ -973,50 +974,26 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                                 modifier = Modifier.size(16.dp),
                             )
                         }
-
-                        Spacer(Modifier.width(8.dp))
-
-                        Text(
-                            "%s - %s (%.1fs)".format(
-                                formatClock(rally.startSec),
-                                formatClock(rally.endSec),
-                                rally.durationSec,
-                            ),
-                            color = Ink,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                        )
                     }
 
-                    val prevGap = if (index > 0) rally.startSec - state.rallies[index - 1].endSec else null
-                    val nextGap = if (index < state.rallies.lastIndex) state.rallies[index + 1].startSec - rally.endSec else null
-
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        if (prevGap != null && prevGap >= 0.1) {
-                            Text(
-                                "距上段 %.1fs".format(prevGap),
-                                color = Color(0xFFA2A2AB),
-                                fontSize = 10.sp,
-                            )
-                        } else if (nextGap != null && nextGap >= 0.1) {
-                            Text(
-                                "距下段 %.1fs".format(nextGap),
-                                color = Color(0xFFA2A2AB),
-                                fontSize = 10.sp,
-                            )
+                    // Set at Playhead shortcuts directly on the right
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        QuickActionButton("以播头设起点") {
+                            viewModel.onEvent(EditorEvent.SetSelectedStartAtPlayhead)
                         }
-                        Text(
-                            "置信度 %d%%".format((rally.confidence * 100).roundToInt()),
-                            color = Muted,
-                            fontSize = 10.sp,
-                        )
+                        QuickActionButton("以播头设终点") {
+                            viewModel.onEvent(EditorEvent.SetSelectedEndAtPlayhead)
+                        }
                     }
                 }
 
-                // Main Trim Control Bar: [起点 -0.5s / +0.5s]  [▶ 播本段]  [终点 -0.5s / +0.5s]
+                // Row 2: [起点 -0.5s / +0.5s]  [▶ 播放]  [终点 -0.5s / +0.5s]
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     // Nudge Start
@@ -1039,7 +1016,7 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = if (isPlaying) Amber else Green),
                         shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
                         modifier = Modifier.height(34.dp),
                     ) {
                         Icon(
@@ -1058,19 +1035,6 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                     }
                     TrimStepButton("终点 +0.5s", modifier = Modifier.weight(1f)) {
                         viewModel.onEvent(EditorEvent.NudgeSelectedEdge(endDelta = 0.5))
-                    }
-                }
-
-                // Secondary Set at Playhead shortcuts
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    QuickActionButton("以播头设为起点", modifier = Modifier.weight(1f)) {
-                        viewModel.onEvent(EditorEvent.SetSelectedStartAtPlayhead)
-                    }
-                    QuickActionButton("以播头设为终点", modifier = Modifier.weight(1f)) {
-                        viewModel.onEvent(EditorEvent.SetSelectedEndAtPlayhead)
                     }
                 }
             }
@@ -1714,7 +1678,14 @@ private fun TrimStepButton(label: String, modifier: Modifier = Modifier, onClick
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+        Text(
+            text = label,
+            color = Ink,
+            fontSize = 10.5.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -1722,14 +1693,15 @@ private fun TrimStepButton(label: String, modifier: Modifier = Modifier, onClick
 private fun QuickActionButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier = modifier
-            .height(28.dp)
+            .height(26.dp)
             .clip(RoundedCornerShape(6.dp))
-            .background(StudioElevated.copy(alpha = 0.6f))
+            .background(StudioElevated)
             .border(1.dp, BorderSubtle, RoundedCornerShape(6.dp))
-            .clickable { onClick() },
+            .clickable { onClick() }
+            .padding(horizontal = 7.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, color = Muted, fontSize = 11.sp)
+        Text(label, color = Ink.copy(alpha = 0.9f), fontSize = 10.5.sp, fontWeight = FontWeight.Medium)
     }
 }
 

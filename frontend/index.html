@@ -1232,13 +1232,11 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      border-top: 1px solid rgba(255, 255, 255, 0.05);
-      padding-top: 5px;
     }
 
     .quick-set-btn {
-      flex: 1;
       height: 26px;
+      padding: 0 8px;
       border-radius: 4px;
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--border-subtle);
@@ -1875,9 +1873,9 @@
         <!-- Selected Rally Header Info Row -->
         <div class="rally-header-row" id="rallyHeaderRow" style="display: none;">
           <span class="rally-header-title" id="rallyHeaderTitle">第 01 / 01 回合</span>
-          <div class="rally-header-meta">
-            <span id="rallyNeighborGapText" style="color: #a2a2ab;"></span>
-            <span id="rallyConfText">置信度 100%</span>
+          <div class="quick-set-row" id="quickSetRow">
+            <button class="quick-set-btn" id="btnSetStartAtPlayhead" title="将当前播放头位置设为本回合起点">以播头设起点</button>
+            <button class="quick-set-btn" id="btnSetEndAtPlayhead" title="将当前播放头位置设为本回合终点">以播头设终点</button>
           </div>
         </div>
 
@@ -1899,12 +1897,6 @@
             <button class="tune-btn" id="tuneEndMinus" title="终点 -0.5s">-0.5s</button>
             <button class="tune-btn extend-btn" id="tuneEndPlus" title="终点 +0.5s (边播边顺延，不打断播放)">+0.5s</button>
           </div>
-        </div>
-
-        <!-- Quick Set Row: 以播头设为起点 / 终点 -->
-        <div class="quick-set-row" id="quickSetRow" style="display: none;">
-          <button class="quick-set-btn" id="btnSetStartAtPlayhead" title="将当前播放头位置设为本回合起点">以播头设为起点</button>
-          <button class="quick-set-btn" id="btnSetEndAtPlayhead" title="将当前播放头位置设为本回合终点">以播头设为终点</button>
         </div>
       </div>
 
@@ -2186,8 +2178,6 @@
       btnImportFullRally: document.getElementById('btnImportFullRally'),
       rallyHeaderRow: document.getElementById('rallyHeaderRow'),
       rallyHeaderTitle: document.getElementById('rallyHeaderTitle'),
-      rallyNeighborGapText: document.getElementById('rallyNeighborGapText'),
-      rallyConfText: document.getElementById('rallyConfText'),
       tuneControlsRow: document.getElementById('tuneControlsRow'),
       tuneStartMinus: document.getElementById('tuneStartMinus'),
       tuneStartPlus: document.getElementById('tuneStartPlus'),
@@ -3060,19 +3050,7 @@
         elements.tuneControlsRow.style.display = 'flex';
         elements.quickSetRow.style.display = 'flex';
 
-        elements.rallyHeaderTitle.textContent = `第 ${idx + 1 < 10 ? '0' : ''}${idx + 1} / ${state.rallies.length < 10 ? '0' : ''}${state.rallies.length} 回合 (${formatTime(r.start)} - ${formatTime(r.end)} · ${(r.end - r.start).toFixed(1)}s)`;
-
-        const prevGap = idx > 0 ? r.start - state.rallies[idx - 1].end : null;
-        const nextGap = idx < state.rallies.length - 1 ? state.rallies[idx + 1].start - r.end : null;
-        if (prevGap !== null && prevGap >= 0.1) {
-          elements.rallyNeighborGapText.textContent = `距上段 ${prevGap.toFixed(1)}s`;
-        } else if (nextGap !== null && nextGap >= 0.1) {
-          elements.rallyNeighborGapText.textContent = `距下段 ${nextGap.toFixed(1)}s`;
-        } else {
-          elements.rallyNeighborGapText.textContent = '';
-        }
-
-        elements.rallyConfText.textContent = `置信度 ${Math.round((r.confidence ?? 1) * 100)}%`;
+        elements.rallyHeaderTitle.textContent = `第 ${idx + 1 < 10 ? '0' : ''}${idx + 1} / ${state.rallies.length < 10 ? '0' : ''}${state.rallies.length} 回合`;
         elements.playRallyPillText.textContent = `播放 #${idx + 1}`;
 
         elements.activeRallyLabel.className = `active-rally-tag${isLow ? ' amber' : ''}`;
