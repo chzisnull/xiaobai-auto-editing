@@ -1677,6 +1677,7 @@ private fun StatusTag(label: String, selected: Boolean, color: Color, onClick: (
 
 /**
  * Thumb Action Item (Icon + label)
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ThumbActionButton(
