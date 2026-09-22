@@ -166,6 +166,7 @@ sealed interface EditorEvent {
     data object PausePlayback : EditorEvent
     data object TogglePlayPause : EditorEvent
     data class FastForward(val deltaSec: Double = 1.5) : EditorEvent
+    data class Rewind(val deltaSec: Double = 1.5) : EditorEvent
     data object StartDirectEdit : EditorEvent
     data object ImportFullVideoAsRally : EditorEvent
     data object ClearAllRallies : EditorEvent

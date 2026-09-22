@@ -126,6 +126,7 @@ class EditorViewModel(
             EditorEvent.PausePlayback -> pausePlayback()
             EditorEvent.TogglePlayPause -> togglePlayPause()
             is EditorEvent.FastForward -> fastForward(event.deltaSec)
+            is EditorEvent.Rewind -> fastForward(-event.deltaSec)
             EditorEvent.StartDirectEdit -> startDirectEdit()
             EditorEvent.ImportFullVideoAsRally -> importFullVideoAsRally()
             EditorEvent.ClearAllRallies -> clearAllRallies()
@@ -577,6 +578,7 @@ class EditorViewModel(
             _uiState.update { state ->
                 val merged = (state.rallies + rally).mergeOverlapping()
                 state.copy(
+                    isDirectEditing = true,
                     rallies = merged,
                     selectedRallyIndex = merged.indexOfFirst { (start in it.startSec..it.endSec) || (it.startSec in start..end) }
                         .takeIf { it >= 0 } ?: merged.indices.firstOrNull(),
@@ -585,7 +587,7 @@ class EditorViewModel(
                 )
             }
         } else {
-            _uiState.update { it.copy(rangeMarkInSec = t, rangeMarkOutSec = null) }
+            _uiState.update { it.copy(isDirectEditing = true, rangeMarkInSec = t, rangeMarkOutSec = null) }
         }
     }
 
@@ -623,6 +625,7 @@ class EditorViewModel(
             }.takeIf { it >= 0 } ?: merged.indices.firstOrNull()
 
             state.copy(
+                isDirectEditing = true,
                 rallies = merged,
                 selectedRallyIndex = newIdx,
                 rangeMarkInSec = null,
@@ -811,7 +814,14 @@ class EditorViewModel(
             }
             try {
                 val app = getApplication<Application>()
-                val file = exporter.exportMerged(app, source, rallies)
+                val isDirect = _uiState.value.isDirectEditing
+                val file = exporter.exportMerged(
+                    context = app,
+                    source = source,
+                    rallies = rallies,
+                    preBufferSec = if (isDirect) 0.0 else 0.2,
+                    postBufferSec = if (isDirect) 0.0 else 0.2,
+                )
                 if (token != sessionToken) return@launch
                 val displayName = "xiaobai_${System.currentTimeMillis()}.mp4"
                 val galleryName = try {

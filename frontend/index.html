@@ -1900,8 +1900,14 @@
         </div>
       </div>
 
-      <!-- Main Action Key Bar (7 Permanent Buttons) -->
+      <!-- Main Action Key Bar (Permanent Core Buttons) -->
       <div class="main-keys-bar">
+        <!-- 0. 后退 1.5s -->
+        <button class="key-btn" id="btnRewind" title="后退 1.5 秒 (快捷键: R)">
+          <i data-lucide="rewind"></i>
+          <span>-1.5s</span>
+        </button>
+
         <!-- 1. 标开始 (常驻按钮) -->
         <button class="key-btn" id="btnMarkStart" title="以当前播放位置作为回合起点 (快捷键: I)">
           <i data-lucide="flag"></i>
@@ -1920,25 +1926,31 @@
           <span>标结束</span>
         </button>
 
-        <!-- 4. 拆分 -->
-        <button class="key-btn" id="btnSplitRally" title="在当前播放头处拆分选中回合 (快捷键: S)" disabled>
-          <i data-lucide="scissors"></i>
-          <span>拆分</span>
+        <!-- 4. 取消本次标记 (仅在标记中显示) -->
+        <button class="key-btn" id="btnCancelMark" title="取消本次标记 (快捷键: Esc)" style="display: none; color: var(--danger-color);">
+          <i data-lucide="x-circle"></i>
+          <span>取消标记</span>
         </button>
 
-        <!-- 5. 删除 -->
+        <!-- 5. 切换回合 (未在标记时显示) -->
+        <button class="key-btn" id="btnSwitchRally" title="切换下一回合 (快捷键: Tab)">
+          <i data-lucide="repeat"></i>
+          <span id="switchRallyText">切换回合</span>
+        </button>
+
+        <!-- 6. 删除 -->
         <button class="key-btn delete-rally-btn" id="btnDeleteRally" title="删除选中回合 (快捷键: Delete)" disabled>
           <i data-lucide="trash-2"></i>
-          <span>删除</span>
+          <span>删除回合</span>
         </button>
 
-        <!-- 6. 回合表 -->
+        <!-- 7. 回合表 -->
         <button class="key-btn" id="btnOpenRalliesSheet" title="查看全部回合列表">
           <i data-lucide="list"></i>
           <span id="rallyCountText">回合 (0)</span>
         </button>
 
-        <!-- 7. 导出 -->
+        <!-- 8. 导出 -->
         <button class="key-btn export-btn" id="btnOpenExportSheet" title="导出剪辑视频" disabled>
           <i data-lucide="download"></i>
           <span>导出</span>
@@ -2189,11 +2201,14 @@
       quickSetRow: document.getElementById('quickSetRow'),
       btnSetStartAtPlayhead: document.getElementById('btnSetStartAtPlayhead'),
       btnSetEndAtPlayhead: document.getElementById('btnSetEndAtPlayhead'),
+      btnRewind: document.getElementById('btnRewind'),
       btnMarkStart: document.getElementById('btnMarkStart'),
       btnMarkStartText: document.getElementById('btnMarkStartText'),
       btnFastForward: document.getElementById('btnFastForward'),
       btnMarkEnd: document.getElementById('btnMarkEnd'),
-      btnSplitRally: document.getElementById('btnSplitRally'),
+      btnCancelMark: document.getElementById('btnCancelMark'),
+      btnSwitchRally: document.getElementById('btnSwitchRally'),
+      switchRallyText: document.getElementById('switchRallyText'),
       btnDeleteRally: document.getElementById('btnDeleteRally'),
       btnOpenRalliesSheet: document.getElementById('btnOpenRalliesSheet'),
       rallyCountText: document.getElementById('rallyCountText'),
@@ -2976,12 +2991,21 @@
         elements.btnMarkStartText.textContent = '已标起点 ●';
         elements.btnMarkEnd.classList.add('active-mark');
         elements.btnFastForward.classList.add('active-mark');
+        if (elements.btnCancelMark) elements.btnCancelMark.style.display = 'inline-flex';
+        if (elements.btnSwitchRally) elements.btnSwitchRally.style.display = 'none';
       } else {
         elements.markingHud.style.display = 'none';
         elements.btnMarkStart.classList.remove('active-mark');
         elements.btnMarkStartText.textContent = '标开始';
         elements.btnMarkEnd.classList.remove('active-mark');
         elements.btnFastForward.classList.remove('active-mark');
+        if (elements.btnCancelMark) elements.btnCancelMark.style.display = 'none';
+        if (elements.btnSwitchRally) {
+          elements.btnSwitchRally.style.display = 'inline-flex';
+          elements.switchRallyText.textContent = state.rallies.length > 0
+            ? `切换 (${(state.selectedRallyIndex ?? 0) + 1}/${state.rallies.length})`
+            : '切换回合';
+        }
       }
     }
 
@@ -3630,11 +3654,18 @@
     elements.btnFfMarkHud.addEventListener('click', () => fastForward(1.5));
     elements.btnCommitMarkHud.addEventListener('click', markRangeEnd);
 
-    // Main 7 Keys
+    // Main Action Keys
+    elements.btnRewind.addEventListener('click', () => fastForward(-1.5));
     elements.btnMarkStart.addEventListener('click', markRangeStart);
     elements.btnFastForward.addEventListener('click', () => fastForward(1.5));
     elements.btnMarkEnd.addEventListener('click', markRangeEnd);
-    elements.btnSplitRally.addEventListener('click', splitSelectedRally);
+    elements.btnCancelMark.addEventListener('click', cancelRangeMark);
+    elements.btnSwitchRally.addEventListener('click', () => {
+      if (state.rallies.length > 0) {
+        const next = ((state.selectedRallyIndex ?? -1) + 1) % state.rallies.length;
+        selectRally(next);
+      }
+    });
     elements.btnDeleteRally.addEventListener('click', deleteSelectedRally);
     elements.btnOpenRalliesSheet.addEventListener('click', openRallySheet);
     elements.btnOpenExportSheet.addEventListener('click', openExportSheet);
@@ -3655,6 +3686,14 @@
       if (e.code === 'Space') {
         e.preventDefault();
         togglePlay();
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        fastForward(-1.5);
+      } else if (e.key === 'Escape') {
+        if (state.rangeMarkIn !== null) {
+          e.preventDefault();
+          cancelRangeMark();
+        }
       } else if (e.key === 'i' || e.key === 'I') {
         e.preventDefault();
         markRangeStart();

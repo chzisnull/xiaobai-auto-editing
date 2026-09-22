@@ -48,6 +48,7 @@ fun EditorTopBar(
     canUndo: Boolean,
     roiActive: Boolean,
     roiEnabled: Boolean,
+    isDirectEditing: Boolean = false,
     onUndo: () -> Unit,
     onToggleRoi: () -> Unit,
     onPickFile: () -> Unit,
@@ -67,7 +68,7 @@ fun EditorTopBar(
         // Brand Left
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable(onClick = onOpenTierSelector),
+            modifier = Modifier.clickable(enabled = !isDirectEditing, onClick = onOpenTierSelector),
         ) {
             Box(
                 modifier = Modifier
@@ -96,13 +97,14 @@ fun EditorTopBar(
                         modifier = Modifier
                             .size(6.dp)
                             .clip(CircleShape)
-                            .background(Green),
+                            .background(if (isDirectEditing) Blue else Green),
                     )
                     Spacer(Modifier.width(4.dp))
                     Text(
-                        text = "${tier.label}档",
-                        color = Muted,
+                        text = if (isDirectEditing) "简洁模式" else "${tier.label}档",
+                        color = if (isDirectEditing) Blue else Muted,
                         fontSize = 10.sp,
+                        fontWeight = if (isDirectEditing) FontWeight.SemiBold else FontWeight.Normal,
                     )
                 }
             }
@@ -124,7 +126,7 @@ fun EditorTopBar(
                 }
             }
 
-            if (roiEnabled) {
+            if (roiEnabled && !isDirectEditing) {
                 Box(
                     modifier = Modifier
                         .height(30.dp)

@@ -9,9 +9,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
@@ -46,9 +48,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.IosShare
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PlayArrow
@@ -222,6 +226,7 @@ fun EditorScreen(viewModel: EditorViewModel) {
                 canUndo = state.canUndo,
                 roiActive = state.showRoiEditor,
                 roiEnabled = state.source != null,
+                isDirectEditing = state.isDirectEditing,
                 onUndo = { viewModel.onEvent(EditorEvent.Undo) },
                 onToggleRoi = {
                     if (state.showRoiEditor) viewModel.onEvent(EditorEvent.HideRoiEditor)
@@ -1063,22 +1068,59 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                             fontWeight = FontWeight.SemiBold,
                         )
                     }
-                    Text(
-                        text = "取消标记",
-                        color = Red,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
+                    Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Red.copy(alpha = 0.15f))
+                            .border(1.dp, Red.copy(alpha = 0.4f), RoundedCornerShape(6.dp))
                             .clickable { viewModel.onEvent(EditorEvent.ClearRangeMarks) }
-                            .padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Close, contentDescription = null, tint = Red, modifier = Modifier.size(12.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                text = "取消本次标记",
+                                color = Red,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
                 }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
+                    // Fast Rewind -1.5s
+                    Box(
+                        modifier = Modifier
+                            .weight(1.1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0x22FFFFFF))
+                            .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
+                            .clickable { viewModel.onEvent(EditorEvent.Rewind(1.5)) }
+                            .padding(vertical = 9.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.FastRewind,
+                                contentDescription = null,
+                                tint = Ink,
+                                modifier = Modifier.size(15.dp),
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                "-1.5s",
+                                color = Ink,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
+                    }
+
                     // Play/Pause
                     Box(
                         modifier = Modifier
@@ -1101,7 +1143,7 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                     // Fast Forward +1.5s
                     Box(
                         modifier = Modifier
-                            .weight(1.3f)
+                            .weight(1.1f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0x2E34C759))
                             .border(1.dp, Color(0xFF34C759), RoundedCornerShape(8.dp))
@@ -1114,13 +1156,13 @@ private fun FastRallyTrimZone(state: EditorUiState, viewModel: EditorViewModel) 
                                 Icons.Default.FastForward,
                                 contentDescription = null,
                                 tint = Color(0xFF34C759),
-                                modifier = Modifier.size(16.dp),
+                                modifier = Modifier.size(15.dp),
                             )
-                            Spacer(Modifier.width(4.dp))
+                            Spacer(Modifier.width(2.dp))
                             Text(
-                                "快进 1.5s",
+                                "+1.5s",
                                 color = Color.White,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                             )
                         }
@@ -1216,7 +1258,6 @@ private fun StickyThumbActionZone(
 ) {
     val selectedIndex = state.selectedRallyIndex
     val currentRallyAtPlayhead = state.rallies.firstOrNull { state.playheadSec in it.startSec..it.endSec }
-    val canSplit = state.source != null && (selectedIndex != null || currentRallyAtPlayhead != null)
     val canDelete = selectedIndex != null || currentRallyAtPlayhead != null
 
     Column(
@@ -1254,43 +1295,44 @@ private fun StickyThumbActionZone(
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color(0x33FFFFFF))
+                            .clickable { viewModel.onEvent(EditorEvent.Rewind(1.5)) }
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    ) {
+                        Text("-1.5s", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
                             .background(Color(0xFF34C759).copy(alpha = 0.25f))
                             .border(1.dp, Color(0xFF34C759), RoundedCornerShape(4.dp))
                             .clickable { viewModel.onEvent(EditorEvent.FastForward(1.5)) }
-                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.FastForward,
-                                contentDescription = null,
-                                tint = Color(0xFF34C759),
-                                modifier = Modifier.size(12.dp),
-                            )
-                            Spacer(Modifier.width(2.dp))
-                            Text(
-                                "快进 1.5s",
-                                color = Color.White,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                            )
-                        }
+                        Text("+1.5s", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
 
-                    Text(
-                        text = "取消",
-                        color = Red,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
+                    Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(4.dp))
+                            .background(Red.copy(alpha = 0.2f))
+                            .border(1.dp, Red.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
                             .clickable { viewModel.onEvent(EditorEvent.ClearRangeMarks) }
                             .padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
+                    ) {
+                        Text(
+                            text = "取消本次标记",
+                            color = Red,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                 }
             }
         }
@@ -1298,11 +1340,19 @@ private fun StickyThumbActionZone(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 6.dp),
+                .padding(horizontal = 2.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 1. 标开始 (常驻按钮)
+            // 1. 后退 1.5s
+            ThumbActionButton(
+                icon = Icons.Default.FastRewind,
+                label = "-1.5s",
+                enabled = state.source != null,
+                onClick = { viewModel.onEvent(EditorEvent.Rewind(1.5)) },
+            )
+
+            // 2. 标开始 (常驻按钮)
             ThumbActionButton(
                 icon = Icons.Default.Flag,
                 label = if (state.rangeMarkInSec != null) "已标起点" else "标开始",
@@ -1312,7 +1362,7 @@ private fun StickyThumbActionZone(
                 onClick = { viewModel.onEvent(EditorEvent.MarkRangeStartAtPlayhead) },
             )
 
-            // 2. 快进 1.5s (常驻按钮)
+            // 3. 快进 1.5s (常驻按钮)
             ThumbActionButton(
                 icon = Icons.Default.FastForward,
                 label = "+1.5s",
@@ -1321,7 +1371,7 @@ private fun StickyThumbActionZone(
                 onClick = { viewModel.onEvent(EditorEvent.FastForward(1.5)) },
             )
 
-            // 3. 标结束 (常驻按钮)
+            // 4. 标结束 (常驻按钮)
             ThumbActionButton(
                 icon = Icons.Default.CheckCircle,
                 label = "标结束",
@@ -1330,18 +1380,38 @@ private fun StickyThumbActionZone(
                 onClick = { viewModel.onEvent(EditorEvent.MarkRangeEndAtPlayhead) },
             )
 
-            // 4. 拆分
-            ThumbActionButton(
-                icon = Icons.Default.ContentCut,
-                label = "拆分",
-                enabled = canSplit,
-                onClick = { viewModel.onEvent(EditorEvent.SplitSelectedAtPlayhead) },
-            )
+            // 5. 取消本次标记 (标记时) / 切换回合 (未标记时，点击切换下一段，长按展开列表)
+            if (state.rangeMarkInSec != null) {
+                ThumbActionButton(
+                    icon = Icons.Default.Close,
+                    label = "取消标记",
+                    tint = Red,
+                    onClick = { viewModel.onEvent(EditorEvent.ClearRangeMarks) },
+                )
+            } else {
+                val roundBadge = if (state.rallies.isNotEmpty()) {
+                    "${(state.selectedRallyIndex ?: 0) + 1}/${state.rallies.size}"
+                } else null
+                ThumbActionButton(
+                    icon = Icons.Default.SwapHoriz,
+                    label = "切换回合",
+                    badge = roundBadge,
+                    enabled = state.rallies.isNotEmpty(),
+                    onLongClick = onOpenRalliesSheet,
+                    onClick = {
+                        if (state.rallies.isNotEmpty()) {
+                            val current = state.selectedRallyIndex ?: -1
+                            val next = (current + 1) % state.rallies.size
+                            viewModel.onEvent(EditorEvent.SelectRally(next))
+                        }
+                    },
+                )
+            }
 
-            // 5. 删除
+            // 6. 删除回合
             ThumbActionButton(
                 icon = Icons.Default.Delete,
-                label = "删除",
+                label = "删除回合",
                 tint = if (canDelete) Red else Muted,
                 enabled = canDelete,
                 onClick = {
@@ -1350,15 +1420,7 @@ private fun StickyThumbActionZone(
                 },
             )
 
-            // 5. 回合表
-            ThumbActionButton(
-                icon = Icons.AutoMirrored.Filled.FormatListBulleted,
-                label = "回合表",
-                badge = if (state.rallies.isNotEmpty()) "${state.rallies.size}" else null,
-                onClick = onOpenRalliesSheet,
-            )
-
-            // 6. 导出 (Glowing Primary Button)
+            // 7. 导出 (Glowing Primary Button)
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(10.dp))
@@ -1366,15 +1428,15 @@ private fun StickyThumbActionZone(
                     .clickable(enabled = state.rallies.isNotEmpty() && !state.isExporting) {
                         viewModel.onEvent(EditorEvent.Export)
                     }
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 if (state.isExporting) {
                     CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.IosShare, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.width(4.dp))
+                        Icon(Icons.Default.IosShare, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
+                        Spacer(Modifier.width(3.dp))
                         Text("导出", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -1615,7 +1677,7 @@ private fun StatusTag(label: String, selected: Boolean, color: Color, onClick: (
 
 /**
  * Thumb Action Item (Icon + label)
- */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ThumbActionButton(
     icon: ImageVector,
@@ -1623,13 +1685,24 @@ private fun ThumbActionButton(
     enabled: Boolean = true,
     tint: Color = Ink,
     badge: String? = null,
+    onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .clickable(enabled = enabled) { onClick() }
-            .padding(horizontal = 5.dp, vertical = 4.dp),
+            .then(
+                if (onLongClick != null && enabled) {
+                    Modifier.combinedClickable(
+                        enabled = enabled,
+                        onClick = onClick,
+                        onLongClick = onLongClick,
+                    )
+                } else {
+                    Modifier.clickable(enabled = enabled, onClick = onClick)
+                }
+            )
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         Column(

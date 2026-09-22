@@ -12,7 +12,7 @@ class FFmpegService:
     FFmpeg 视频剪辑、缓冲扩展、硬件加速与压缩导出引擎 (Milestone 3)
     """
     PRESETS = {
-        "original": {"scale": None, "crf": 20, "preset": "fast"},
+        "original": {"scale": None, "crf": 18, "preset": "fast"},
         "1080p": {"scale": "1920:1080", "crf": 24, "preset": "medium"},
         "720p": {"scale": "1280:720", "crf": 28, "preset": "faster"}
     }
@@ -372,13 +372,14 @@ class FFmpegService:
         for i, seg in enumerate(segments):
             s = seg["start"]
             e = seg["end"]
-            v_filt = f"[0:v]trim=start={s}:end={e},setpts=PTS-STARTPTS,fps=30"
-            v_filt += self._scale_filter(scale)
+            v_filt = f"[0:v]trim=start={s}:end={e},setpts=PTS-STARTPTS"
+            if scale:
+                v_filt += f",fps=30" + self._scale_filter(scale)
             v_filt += f"[v{i}]"
             filter_parts.append(v_filt)
 
             if has_audio:
-                a_filt = f"[0:a]atrim=start={s}:end={e},asetpts=PTS-STARTPTS,aresample=async=1[a{i}]"
+                a_filt = f"[0:a]atrim=start={s}:end={e},asetpts=PTS-STARTPTS,aresample=async=1000:first_pts=0[a{i}]"
                 filter_parts.append(a_filt)
 
         concat_v_a = []
